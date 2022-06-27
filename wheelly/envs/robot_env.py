@@ -151,8 +151,9 @@ class RobotEnv(gym.Env):
 
     def process_action(self, action):
         """Process the action"""
-        now = time();
-        moveCmd = "al" if action["halt"] == 1 else f"mv {action['direction'][0]} {action['speed'][0]:.1f}"
+        now = time()
+        dir = self._robot_dir + action['direction']
+        moveCmd = "al" if action["halt"] == 1 else f"mv {dir[0]} {action['speed'][0]:.1f}"
         if self._last_move_cmd != moveCmd:
             self._last_move_cmd = self._robot.write_cmd(moveCmd)
             self._last_move_timestamp = now

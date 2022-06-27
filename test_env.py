@@ -1,6 +1,7 @@
 import gym
 import wheelly.envs.robot_env
 import pygame
+import numpy as np
 import logging
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s %(name)s: %(message)s')
@@ -17,7 +18,7 @@ env.action_space.seed(42)
 observation = env.reset(seed=42, return_info=False)
 logging.debug(f"observation=:{observation}")
 
-running = True;
+running = True
 while running:
     action = env.action_space.sample()
     #action["halt"] = 1
