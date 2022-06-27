@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
-### Add
+### Added
 
 - Issue #1: Add real robot environment
 
+
+### Changed
+
+-Issue #5: Change to differential direction of move action
