@@ -12,6 +12,17 @@ logger = logging.getLogger(__name__)
 REACTION_INTERVAL = 0.3
 COMMAND_INTERVAL = 0.9
 
+MIN_SENSOR = -90
+MAX_SENSOR = 90
+MIN_DISTANCE = 0.0
+MAX_DISTANCE = 10.0
+NUM_CONTACT_VALUES = 16
+
+MIN_DIRECTION_ACTION = -180
+MAX_DIRECTION_ACTION = 180
+MIN_SPEED = -1.0
+MAX_SPEED = 1.0
+
 WINDOW_SIZE = 800
 GRID_SIZE = 0.2
 ROBOT_LENGTH = 0.3
@@ -54,20 +65,18 @@ class RobotEnv(gym.Env):
 
         self.observation_space = spaces.Dict(
             {
-                "direction": spaces.Box(-180, 180, shape=(1,), dtype=np.int32),
-                "sensor": spaces.Box(-90, 90, shape=(1,), dtype=np.int32),
-                "distance": spaces.Box(0, 10, shape=(1,), dtype=np.float32),
+                "sensor": spaces.Box(MIN_SENSOR, MAX_SENSOR, shape=(1,), dtype=np.int32),
+                "distance": spaces.Box(MIN_DISTANCE, MAX_DISTANCE, shape=(1,), dtype=np.float32),
                 "canMoveForward": spaces.Discrete(2),
-                "canMoveBackward": spaces.Discrete(2),
-                "contacts": spaces.Discrete(16)
+                "contacts": spaces.Discrete(NUM_CONTACT_VALUES)
             }
         )
         self.action_space = spaces.Dict(
             {
                 "halt":  spaces.Discrete(2),
-                "direction": spaces.Box(-180, 179, shape=(1,), dtype=np.int32),
-                "speed": spaces.Box(-1, 1, shape=(1,), dtype=np.float32),
-                "sensor": spaces.Box(-90, 90, shape=(1,), dtype=np.int32),
+                "direction": spaces.Box(-MIN_DIRECTION_ACTION, MAX_DIRECTION_ACTION, shape=(1,), dtype=np.int32),
+                "speed": spaces.Box(MIN_SPEED, MAX_SPEED, shape=(1,), dtype=np.float32),
+                "sensor": spaces.Box(MIN_SENSOR, MAX_SENSOR, shape=(1,), dtype=np.int32),
             }
         )
         self._robot = robot.Robot(params)
@@ -81,11 +90,9 @@ class RobotEnv(gym.Env):
     def _get_obs(self):
         """Return the observation"""
         return {
-            "direction": self._robot_dir,
             "sensor": self._sens_dir,
             "distance": self._distance,
             "canMoveForward": self._can_move_forward,
-            "canMoveBackward": self._can_move_backward,
             "contacts": self._contacts,
         }
 
