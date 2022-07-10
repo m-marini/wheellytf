@@ -1,5 +1,5 @@
 import re
-import wheelly.envs.robot as robot
+import wheelly.robot as robot
 
 def test_re():
 

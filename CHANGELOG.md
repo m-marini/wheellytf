@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - Issue #1: Add real robot environment
 - Issue #3: Add wrapper
+- Issue #4: Add Tensor Force
 
 ### Changed
 
--Issue #5: Change to differential direction of move action
+- Issue #5: Change to differential direction of move action

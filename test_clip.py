@@ -1,29 +1,30 @@
 import numpy as np
-import numpy.testing as tnp
-from gym import spaces
-import wheelly.encoders as en
-import numpy.testing as tnp
+from numpy.testing import assert_equal
+from wheelly.encoders import SupplyEncoder, ClipEncoder
 import pytest
+from gym.spaces import Box, Discrete
 
 def test_clip_space1():
-    space = spaces.Box(low=np.array([-10,-10]), high=np.array([10,20]))
-    low=np.array([-1, 0])
-    high=np.array([0, 1])
-    encoder = en.ClipEncoder(en.IdentityEncoder(space, None), low, high)
+    space = Box(np.array([-10,-10]), np.array([10,20]))
+    low = np.array([-1, 0])
+    high = np.array([0, 1])
+    encoder = ClipEncoder(SupplyEncoder(space, lambda:np.array([-10, -10])), low, high)
     clip_space = encoder.space()
-    assert isinstance(clip_space, spaces.Box)
-    tnp.assert_array_equal(clip_space.low, low)
-    tnp.assert_array_equal(clip_space.high, high)
+    assert isinstance(clip_space, Box)
+    assert_equal(clip_space.low, low)
+    assert_equal(clip_space.high, high)
 
 def test_clip_space10():
-    space = spaces.Discrete(2)
+    space = Discrete(2)
+    low = np.array([-1, 0])
+    high = np.array([0, 1])
     with pytest.raises(Exception) as e_info:
-        en.ClipEncoder(space, np.array([5]), np.array([5]))
+        ClipEncoder(SupplyEncoder(space, lambda:np.array([-10, -10])), low, high)
 
 def test_clip_1():
-    space = spaces.Box(low=np.array([-10,-10]), high=np.array([10,20]))
-    low=np.array([-1, 0])
-    high=np.array([0, 1])
-    encoder = en.ClipEncoder(en.IdentityEncoder(space, lambda:np.array([-10, -10])), low, high)
+    space = Box(np.array([-10,-10]), np.array([10,20]))
+    low = np.array([-1, 0])
+    high = np.array([0, 1])
+    encoder = ClipEncoder(SupplyEncoder(space, lambda:np.array([-10, -10])), low, high)
     y = encoder.encode()
-    tnp.assert_array_equal(y, np.array([-1,0]))
+    assert_equal(y, np.array([-1,0]))

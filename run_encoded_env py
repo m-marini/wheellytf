@@ -1,0 +1,45 @@
+import pygame
+from tensorforce import Environment
+from wheelly.envs import EncodedRobotEnv, RobotEnv
+
+from tensorforce.agents import Agent
+
+import logging
+
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s %(name)s: %(message)s')
+logging.getLogger("wheelly.envs.robot").setLevel(logging.DEBUG)
+
+env1:RobotEnv = Environment.create(
+    environment=RobotEnv,
+    robotHost="192.168.1.11",
+    robotPort=22
+)
+
+environment:EncodedRobotEnv = Environment.create(
+    environment=EncodedRobotEnv,
+    env=env1
+)
+
+agent:Agent = Agent.create(
+#    agent='a2c',
+#    agent='ac',
+    agent='random',
+    environment=environment,
+#    batch_size=10
+)
+
+states = environment.reset()
+env1.render()
+
+running = True
+while running:
+    actions = agent.act(states=states)
+    states, terminal, reward = environment.execute(actions=actions)
+    agent.observe(terminal=terminal, reward=reward)
+    env1.render()
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+            break
+environment.close()
+pygame.quit()

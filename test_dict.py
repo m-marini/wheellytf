@@ -1,14 +1,15 @@
-from gym.spaces import Dict,Discrete
-import scipy as sp
-from wheelly.encoders import DictEncoder, IdentityEncoder
-import numpy.testing as tnp
+from wheelly.encoders import DictEncoder, SupplyEncoder
+import numpy as np
+from gym.spaces import Discrete,Dict
 
 def test_dict_space():
     space1 = Discrete(2)
     space2 = Discrete(3)
+    a = np.array([1])
+    b = np.array([2])
     encoder = DictEncoder(
-        a=IdentityEncoder(space1, None),
-        b=IdentityEncoder(space2, None))
+        a=SupplyEncoder(space1, lambda: a),
+        b=SupplyEncoder(space2, lambda: b))
     result = encoder.space()
     assert isinstance(result, Dict)
     assert result.get("a") == space1
@@ -17,11 +18,11 @@ def test_dict_space():
 def test_dict():
     space1 = Discrete(2)
     space2 = Discrete(3)
-    a = space1.sample()
-    b = space2.sample()
+    a = np.array([1])
+    b = np.array([2])
     encoder = DictEncoder(
-        a=IdentityEncoder(space1, lambda:a),
-        b=IdentityEncoder(space2, lambda:b))
+        a=SupplyEncoder(space1, lambda: a),
+        b=SupplyEncoder(space2, lambda: b))
     result = encoder.encode()
     assert result.get("a") == a
     assert result.get("b") == b

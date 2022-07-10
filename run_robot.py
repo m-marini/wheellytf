@@ -1,13 +1,13 @@
-import wheelly.envs.robot as robot
+import wheelly.robot as robot
 import time
 import logging
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(name)s: %(message)s')
 
-r = robot.Robot({
-    "host": "192.168.1.11",
-    "port": 22
-    })
+r = robot.Robot(
+    host= "192.168.1.11",
+    port= 22
+)
 
 r.connect()
 s = r.read_status()

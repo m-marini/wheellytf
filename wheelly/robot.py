@@ -2,26 +2,25 @@ import socket
 import re
 import time
 import logging
-
-from matplotlib.colors import NoNorm
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
-CONNECTION_TIMEOUT = 10
-READ_TIMEOUT = 1
+CONNECTION_TIMEOUT = 10.0
+READ_TIMEOUT = 3.0
 
 class Robot:
-    def __init__(self, params):
+    def __init__(self, **kvargs):
         """Create a Robot object to comunicate to robot
         
         Arguments:
 
         params -- dict the dictionary with the paramters
         """
-        self._host = params["host"]
-        self._port = params["port"]
-        self._connection_timeout = params["connectionTimeout"] if "connectionTimeout" in params else CONNECTION_TIMEOUT
-        self._read_timeout = params["readTimeout"] if "readTimeout" in params else READ_TIMEOUT
+        self._host = kvargs["robotHost"]
+        self._port = kvargs["robotPort"]
+        self._connection_timeout = kvargs["connectionTimeout"] if "connectionTimeout" in kvargs else CONNECTION_TIMEOUT
+        self._read_timeout = kvargs["readTimeout"] if "readTimeout" in kvargs else READ_TIMEOUT
         self._socket = None
         self._timestamp_offset = None
 
