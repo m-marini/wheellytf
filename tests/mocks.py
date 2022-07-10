@@ -1,6 +1,6 @@
 import gym
 from gym import spaces
-from wheelly.envs.robot_env import MAX_SENSOR, MAX_DISTANCE, MAX_SPEED, MAX_DIRECTION_ACTION, MIN_DIRECTION_ACTION, MIN_DISTANCE, MIN_SENSOR, MIN_SPEED, NUM_CONTACT_VALUES
+from wheelly.envs.gym_env import MAX_SENSOR, MAX_DISTANCE, MAX_SPEED, MAX_DIRECTION_ACTION, MIN_DIRECTION_ACTION, MIN_DISTANCE, MIN_SENSOR, MIN_SPEED, NUM_CONTACT_VALUES
 import numpy as np
 
 import logging
@@ -52,6 +52,9 @@ class MockRobotEnv(gym.Env):
     def set_contacts(self, value:int):
         self._contacts = value
 
+    def act(self):
+        return self._action
+
     def observation(self):
         return {
             "direction": np.array(self._robot_dir),
@@ -68,10 +71,10 @@ class MockRobotEnv(gym.Env):
         return (observation, {}) if return_info else observation
 
     def step(self, action):
-
         # Map the action (element of {0,1,2,3}) to the direction we walk in
         # An episode is done if the agent has reached the target
-         # Binary sparse rewards
+        # Binary sparse rewards
+        self._action = action
         return self.observation(), self._reward, False, {}
 
     def render(self, mode=""):
