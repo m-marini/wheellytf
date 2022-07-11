@@ -1,8 +1,10 @@
 import numpy as np
-from wheelly.encoders import GetEncoder, SupplyEncoder
-from gym.spaces import Dict, Discrete
 import pytest
+from gym.spaces import Dict, Discrete
 from numpy.testing import assert_equal
+
+from wheelly.encoders import GetEncoder, SupplyEncoder
+
 
 def test_get_space():
     space = Dict(

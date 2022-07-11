@@ -1,5 +1,6 @@
 from numpy import ndarray
-from tensorforce import Environment, Agent
+from tensorforce import Agent, Environment
+
 from wheelly.envs import EncodedRobotEnv, MockRobotEnv
 
 NO_TILINIG = 8

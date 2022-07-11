@@ -1,8 +1,9 @@
-from wheelly.encoders import createSpace
-from gym.spaces import MultiBinary,Discrete, MultiDiscrete, Box, Dict
 import numpy as np
+from gym.spaces import Box, Dict, Discrete, MultiBinary, MultiDiscrete
 from numpy.testing import assert_equal
-import pytest
+
+from wheelly.encoders import createSpace
+
 
 def test_create_binary():
     space = createSpace({

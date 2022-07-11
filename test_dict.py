@@ -1,6 +1,8 @@
-from wheelly.encoders import DictEncoder, SupplyEncoder
 import numpy as np
-from gym.spaces import Discrete,Dict
+from gym.spaces import Dict, Discrete
+
+from wheelly.encoders import DictEncoder, SupplyEncoder
+
 
 def test_dict_space():
     space1 = Discrete(2)

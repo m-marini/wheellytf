@@ -1,0 +1,5 @@
+{
+    "environment": "wheelly.envs.RobotEnv",
+    "robotHost": "192.168.1.11",
+    "robotPort": 22
+}

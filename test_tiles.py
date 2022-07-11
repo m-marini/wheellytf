@@ -1,9 +1,13 @@
-import numpy as np
 import re
+
+import numpy as np
 import pytest
-from wheelly.encoders import TilesEncoder, SupplyEncoder, displacement, features, no_tiling, offsets, tile
+from gym.spaces import Box, Discrete, MultiBinary
 from numpy.testing import assert_equal
-from gym.spaces import Box, MultiBinary,Discrete
+
+from wheelly.encoders import (SupplyEncoder, TilesEncoder, displacement,
+                              features, no_tiling, offsets, tile)
+
 
 def test_no_tiles1():
     n = no_tiling(1)

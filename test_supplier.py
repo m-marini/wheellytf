@@ -1,8 +1,10 @@
 import numpy as np
 import pytest
-from gym.spaces import Discrete, MultiDiscrete,MultiBinary, Box, Dict
-from wheelly.encoders import SupplyEncoder
+from gym.spaces import Box, Dict, Discrete, MultiBinary, MultiDiscrete
 from numpy.testing import assert_equal
+
+from wheelly.encoders import SupplyEncoder
+
 
 def test_space1():
     space = Discrete(n=2)

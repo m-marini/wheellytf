@@ -1,8 +1,10 @@
 import numpy as np
-from numpy.testing import assert_equal
-from wheelly.encoders import SupplyEncoder, ClipEncoder
 import pytest
 from gym.spaces import Box, Discrete
+from numpy.testing import assert_equal
+
+from wheelly.encoders import ClipEncoder, SupplyEncoder
+
 
 def test_clip_space1():
     space = Box(np.array([-10,-10]), np.array([10,20]))
