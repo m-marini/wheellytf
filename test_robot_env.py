@@ -1,8 +1,9 @@
 import numpy as np
 from numpy import int8, ndarray, zeros
-from tensorforce import Environment
-from wheelly.envs import EncodedRobotEnv, MockRobotEnv
 from numpy.testing import assert_equal
+from tensorforce import Environment
+
+from wheelly.envs import EncodedRobotEnv, MockRobotEnv
 
 NO_TILINIG = 8
 NO_TILES = 8 * 31

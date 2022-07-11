@@ -1,13 +1,14 @@
-from tensorforce import Environment
-
 import logging
+
+from tensorforce import Environment
 
 from wheelly.envs import MockRobotEnv
 
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s %(name)s: %(message)s')
-logging.getLogger("wheelly.envs.robot").setLevel(logging.DEBUG)
 
 def test_env1():
+    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s %(name)s: %(message)s')
+    logging.getLogger("wheelly.envs.robot").setLevel(logging.DEBUG)
+
     environment = Environment.create(
         environment=MockRobotEnv
     )

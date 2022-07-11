@@ -1,8 +1,10 @@
 import numpy as np
 import pytest
-from numpy.testing import assert_equal
-from wheelly.encoders import FeaturesEncoder, SupplyEncoder
 from gym.spaces import Box, Discrete, MultiBinary, MultiDiscrete
+from numpy.testing import assert_equal
+
+from wheelly.encoders import FeaturesEncoder, SupplyEncoder
+
 
 def test_features_space_float():
     space = Box(0, 1, (1,))

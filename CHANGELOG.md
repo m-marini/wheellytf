@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 
+- Issue #10: Add save model
+
+## [0.1.0] 2022-07-10
+
+### Added
+
 - Issue #1: Add real robot environment
 - Issue #3: Add wrapper
 - Issue #4: Add Tensor Force

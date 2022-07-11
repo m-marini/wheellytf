@@ -1,7 +1,9 @@
 import numpy as np
-from numpy.testing import assert_equal
-from wheelly.encoders import MergeEncoder, SupplyEncoder
 from gym.spaces import Box, Discrete, MultiBinary, MultiDiscrete
+from numpy.testing import assert_equal
+
+from wheelly.encoders import MergeEncoder, SupplyEncoder
+
 
 def test_merge_binary_space1():
     space1 = MultiBinary(2)

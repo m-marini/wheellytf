@@ -1,7 +1,9 @@
 import numpy as np
-from wheelly.encoders import SupplyEncoder, ScaleEncoder
+from gym.spaces import Box, Discrete
 from numpy.testing import assert_equal
-from gym.spaces import Discrete, Box
+
+from wheelly.encoders import ScaleEncoder, SupplyEncoder
+
 
 def test_scale_space1():
     space = Discrete(2)
