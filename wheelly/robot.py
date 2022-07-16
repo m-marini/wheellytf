@@ -90,7 +90,7 @@ class Robot:
             timestamp = time.time()
             line = data.decode("utf-8")
             logger.debug("<-- %s", line[0: -1])
-            return (line, timestamp)
+            return line, timestamp
         else:
             return None
 
@@ -127,7 +127,7 @@ class Robot:
 
     # st 36517 0.000 0.000 1 0 0.22 0.000 0.000 0 13.12 1 1 0 1 0 0.00 0
     # st clk x y deg sens dist left right contacs voltage canMoveForw camMoveBack imuFailure halt moveDir moveSpeed nextSensor
-    def parse_status(self, timed_line):
+    def parse_status(self, timed_line:tuple[str, float]):
         """Parse the status line and return the status dictionary
     
         Arguments:
@@ -136,7 +136,8 @@ class Robot:
         """
         m = re.search(r"st (\d*) (-?\d*\.\d*) (-?\d*\.\d*) (-?\d*) (-?\d*) (-?\d*\.\d*) (-?\d*\.\d*) (-?\d*\.\d*) (\d*) (-?\d*\.\d*) ([01]) ([01]) ([01]) ([01]) (-?\d*) (-?\d*\.\d*) (-?\d*)", timed_line[0])
         return {
-            "timestamp": float(m.group(1)) / 1000 + self._timestamp_offset,
+            #"timestamp": float(m.group(1)) / 1000 + self._timestamp_offset,
+            "timestamp": timed_line[1],
             "x": float(m.group(2)),
             "y": float(m.group(3)),
             "dir": int(m.group(4)),

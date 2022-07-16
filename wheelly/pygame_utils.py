@@ -7,16 +7,22 @@ from pygame import Surface
 
 WINDOW_SIZE = 800
 GRID_SIZE = 0.2
-ROBOT_LENGTH = 0.3
-ROBOT_WIDTH = 0.2
+ROBOT_WIDTH = 0.18
+ROBOT_LENGTH = 0.26
+ROBOT_W_BEVEL = 0.06
+ROBOT_L_BEVEL = 0.05
 WORLD_SIZE = 10.0
 BACKGROUND_COLOR = (0, 0, 0)
-ROBOT_COLOR = (0, 0, 255)
+ROBOT_COLOR = (255, 255, 0)
 ROBOT_SHAPE = np.array([
-    (ROBOT_LENGTH / 2, 0),
-    (-ROBOT_LENGTH / 2, ROBOT_WIDTH / 2),
-    (-ROBOT_LENGTH / 2, -ROBOT_WIDTH / 2),
+    (ROBOT_WIDTH / 2 - ROBOT_W_BEVEL, ROBOT_LENGTH / 2),
+    (ROBOT_WIDTH / 2, ROBOT_LENGTH / 2 - ROBOT_L_BEVEL),
+    (ROBOT_WIDTH / 2, -ROBOT_LENGTH / 2),
+    (-ROBOT_WIDTH / 2, -ROBOT_LENGTH / 2),
+    (-ROBOT_WIDTH / 2, ROBOT_LENGTH / 2 - ROBOT_L_BEVEL),
+    (-ROBOT_WIDTH / 2 + ROBOT_W_BEVEL, ROBOT_LENGTH / 2),
     ])
+
 OBSTACLE_SIZE = 0.2
 OBSTACLE_COLOR = (255, 0, 0)
 OBSTACLE_SHAPE = np.array([
@@ -26,36 +32,48 @@ OBSTACLE_SHAPE = np.array([
     (OBSTACLE_SIZE / 2, -OBSTACLE_SIZE / 2),
 ])
 
-SENSOR_COLOR = (255, 255, 0)
-SENSOR_LENGTH = 0.8
+SENSOR_COLOR = (255, 0, 0)
+SENSOR_LENGTH = 3.0
 SENSOR_SHAPE = np.array([
     (0.0, 0.0),
     (SENSOR_LENGTH, 0.0)
 ])
 
-def render(window:Surface, robot_location:ndarray, robot_dir:int, sensor_dir:int):
-    """Render the environment
-    """
-    if window is None:
+class RobotWindow:
+
+    def __init__(self):
         pygame.init()
         pygame.display.init()
-        window = pygame.display.set_mode((WINDOW_SIZE, WINDOW_SIZE))
+        self.window = pygame.display.set_mode((WINDOW_SIZE, WINDOW_SIZE))
+        self._robor_pos= np.zeros(2)
+        self._robor_dir= 0
+        self._sensor_dir = 0
+    
+    def robot_pos(self, robot_location:ndarray):
+        self._robot_pos = robot_location
 
-    canvas = pygame.Surface((WINDOW_SIZE, WINDOW_SIZE))
-    canvas.fill(BACKGROUND_COLOR)
-    trans = transMatrix()
-    drawRobot(canvas, trans, robot_location, robot_dir)
-    drawSensor(canvas, trans, robot_location, robot_dir, sensor_dir)
+    def robot_dir(self, robot_dir:int):
+        self._robot_dir = robot_dir
 
-    # The following line copies our drawings from `canvas` to the visible window
-    window.blit(canvas, canvas.get_rect())
-    pygame.event.pump()
-    pygame.display.update()
-    return window
+    def sensor_dir(self, sensor_dir:int):
+        self._sensor_dir = sensor_dir
+
+    def render(self):
+        canvas = pygame.Surface((WINDOW_SIZE, WINDOW_SIZE))
+        canvas.fill(BACKGROUND_COLOR)
+        trans = transMatrix()
+        drawRobot(canvas, trans, self._robot_pos, self._robot_dir)
+        drawSensor(canvas, trans, self._robot_pos, self._robot_dir, self._sensor_dir)
+
+        # The following line copies our drawings from `canvas` to the visible window
+        self.window.blit(canvas, canvas.get_rect())
+        pygame.event.pump()
+        pygame.display.update()
     
 def transMatrix():
     """Return the transform matrix to render the shapes"""
-    return scale((WINDOW_SIZE / WORLD_SIZE, WINDOW_SIZE / WORLD_SIZE)) @ rotate(-math.pi/2) @ translate((WINDOW_SIZE/2, WINDOW_SIZE/2))
+    #return scale((WINDOW_SIZE / WORLD_SIZE, WINDOW_SIZE / WORLD_SIZE)) @ rotate(-math.pi/2) @ translate((WINDOW_SIZE/2, WINDOW_SIZE/2))
+    return scale((WINDOW_SIZE / WORLD_SIZE, -WINDOW_SIZE / WORLD_SIZE)) @ translate((WINDOW_SIZE/2, WINDOW_SIZE/2))
 
 def drawRobot(canvas:Surface, trans:ndarray, robot_location:ndarray, robot_dir:int):
     """Draw the robot shape
@@ -64,7 +82,7 @@ def drawRobot(canvas:Surface, trans:ndarray, robot_location:ndarray, robot_dir:i
     canvas -- the canvas
     trans -- the transformation matrix
     """
-    trans = rotate(math.radians(robot_dir)) @ translate(robot_location) @ trans
+    trans = rotate(-math.radians(robot_dir)) @ translate(robot_location) @ trans
     shape = transform(trans, ROBOT_SHAPE)
     pygame.draw.polygon(
         canvas,
@@ -79,7 +97,7 @@ def drawSensor(canvas:Surface, trans:ndarray, robot_location:ndarray, robot_dir:
     canvas -- the canvas
     trans -- the transformation matrix
     """
-    angle = math.radians(robot_dir + sens_dir)
+    angle = math.radians(90 - robot_dir - sens_dir)
     shape = SENSOR_SHAPE.copy()
     shape = transform(rotate(angle) @ translate(robot_location) @ trans,
             shape)
