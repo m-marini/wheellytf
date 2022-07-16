@@ -5,7 +5,33 @@ from tensorforce import Environment
 from tensorforce.agents import Agent
 
 from wheelly.envs import RobotEnv
+from wheelly.pygame_utils import RobotWindow
 
+
+def constant_agent(environment):
+    return Agent.create(
+            environment=environment,
+            agent='constant',
+            action_values={
+                'halt': 0,
+                'direction': 0,
+                'speed': 1,
+                'sensorAction': 0
+            }
+    )
+
+def random_agent(environment):
+    return Agent.create(
+            environment=environment,
+            agent='random',
+    )
+
+def a2c_agent(environment):
+    return Agent.create(
+        environment=environment,
+        agent='a2c',
+        batch_size=10
+    )
 
 def main():
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s %(name)s: %(message)s')
@@ -17,23 +43,26 @@ def main():
         robotPort=22
     )
 
-    agent:Agent = Agent.create(
-        agent='a2c',
-    #    agent='ac',
-    #    agent='random',
-        environment=environment,
-        batch_size=10
-    )
+    agent:Agent = constant_agent(environment)
 
     states = environment.reset()
-    environment.render()
+    window = RobotWindow()
+    window.robot_pos(environment.robot_pos())
+    window.robot_dir(environment.robot_dir())
+    window.sensor_dir(environment.sensor_dir())
+    window.render()
 
     running = True
     while running:
         actions = agent.act(states=states)
         states, terminal, reward = environment.execute(actions=actions)
         agent.observe(terminal=terminal, reward=reward)
-        environment.render()
+        
+        window.robot_pos(environment.robot_pos())
+        window.robot_dir(environment.robot_dir())
+        window.sensor_dir(environment.sensor_dir())
+        window.render()
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False

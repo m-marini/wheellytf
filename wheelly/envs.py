@@ -1,14 +1,18 @@
+import logging
 from time import time
 from typing import Any
-from typing_extensions import Self
-from tensorforce import Environment
+
 import numpy as np
+from Box2D import b2World, b2Body, b2Vec2
+from tensorforce import Environment
+
+from wheelly.encoders import (ClipEncoder, DictEncoder, FeaturesEncoder,
+                              GetEncoder, MergeEncoder, ScaleEncoder,
+                              SupplyEncoder, TilesEncoder, createSpace)
+
+from math import degrees, pi
 from . import robot
-from wheelly.encoders import ClipEncoder, DictEncoder, FeaturesEncoder, GetEncoder, SupplyEncoder, MergeEncoder, ScaleEncoder, TilesEncoder, createSpace
 
-import logging
-
-from wheelly.pygame_utils import render
 logger = logging.getLogger(__name__)
 
 REACTION_INTERVAL = 0.3
@@ -33,7 +37,7 @@ NUM_DIRECTION_ACTIONS = 25
 NUM_SPEED_ACTIONS = 9
 NUM_SENSOR_ACTIONS = 7
 
-_BASIC_STATES = {
+_BASE_STATES = {
     "sensor": {
         "type": 'float',
                 "shape": (1,),
@@ -76,7 +80,6 @@ _BASE_ACTION = {
         "max_value": float(MAX_SENSOR)}
 }
 
-
 class MockRobotEnv(Environment):
     def __init__(self):
         """Create a Robot envinment
@@ -93,7 +96,7 @@ class MockRobotEnv(Environment):
         self._reward = np.zeros((1,))
 
     def states(self):
-        return _BASIC_STATES
+        return _BASE_STATES
 
     def actions(self):
         return _BASE_ACTION
@@ -133,7 +136,6 @@ class MockRobotEnv(Environment):
             "contacts": self._contacts
         }
 
-
 class RobotEnv(Environment):
     def __init__(self, **kvargs):
         """Create a Robot envinment
@@ -161,7 +163,16 @@ class RobotEnv(Environment):
         self.window = None
 
     def states(self):
-        return _BASIC_STATES
+        return _BASE_STATES
+
+    def robot_pos(self):
+        return np.array(self._robot_location)
+
+    def robot_dir(self):
+        return self._robot_dir
+
+    def sensor_dir(self):
+        return self._sensor
 
     def actions(self):
         return _BASE_ACTION
@@ -185,9 +196,8 @@ class RobotEnv(Environment):
         status = self._readStatus()
         self._status_timeout += self._reaction_interval
 
-        reward = -1 if self._can_move_forward[0] == 0 or status["canMoveBackward"] == 0 else \
-            1 if status["left"] == 0 and status["right"] == 0 else \
-            0
+        reward = self._reward(status)
+
         observation = self._get_obs()
         return observation, False, reward
 
@@ -196,14 +206,11 @@ class RobotEnv(Environment):
         if self._robot != None:
             self._robot.close()
 
-    def render(self, mode="human"):
-        """Render the environment
-        
-        Argument
-        mode -- (string) render mode (default "human")
-        """
-        self.window = render(self.window, self._robot_location,
-                             self._robot_dir, self._sensor)
+    def _reward(self, status: dict[str, Any]):
+        return -1 if self._can_move_forward[0] == 0 \
+            or status["canMoveBackward"] == 0 else \
+            1 if status["left"] == 0 and status["right"] == 0 and self._sensor == 0 else \
+            0
 
     def _readStatus(self):
         while True:
@@ -346,3 +353,90 @@ class EncodedRobotEnv(Environment):
     def _convert_action(self, act: Any):
         self._act = act
         return self._out_act_encoder.encode()
+
+ROBOT_WIDTH = 0.18
+ROBOT_LENGTH = 0.26
+ROBOT_MASS = 0.78
+ROBOT_DENSITY = ROBOT_MASS / ROBOT_LENGTH / ROBOT_WIDTH
+ROBOT_FRICTION = 0.3
+ROBOT_TRACK = 0.136
+
+MAX_ACC = 1
+MAX_FORCE = MAX_ACC * ROBOT_MASS
+MAX_VELOCITY = 0.280
+
+VELOCITY_ITER = 10
+POSITION_ITER = 10
+TIME_STEP = 0.3
+
+class SimRobotEnv(Environment):
+    def __init__(self):
+        """Create a Rsimulated robot envinment
+        
+        Argument:
+        params -- (dict) the dictionary with parameters
+        """
+        super().__init__()
+
+        self._sensor = np.zeros((1,))
+        self._distance = np.array([MAX_DISTANCE])
+        self._can_move_forward = np.array([1])
+        self._contacts = np.array([0])
+        self._reward = np.zeros((1,))
+        world:b2World = b2World(gravity=(0,0), doSleep=True)
+        robot:b2Body = world.CreateDynamicBody(position=(0,0))
+        box = robot.CreatePolygonFixture(box=(ROBOT_WIDTH / 2, ROBOT_LENGTH/ 2), density=ROBOT_DENSITY, friction=ROBOT_FRICTION)
+        robot.angle = pi / 2
+        self.world = world
+        self.robot = robot
+        self.robotBox = box
+
+    def states(self):
+        return _BASE_STATES
+
+    def actions(self):
+        return _BASE_ACTION
+
+    def reset(self):
+        """Reset the environment and return the tuple with observation and info """
+        return self._get_obs()
+
+    def execute(self, actions):
+        """Run a step for the environment and return the tuple with observation, reward, done flag, info
+
+        Argument:
+        action -- (Action) the action to perfom
+        """
+        self._action = actions
+        self._simulate()
+        observation = self._get_obs()
+        return observation, False, self._reward
+
+    def act(self):
+        return self._action
+
+    def _get_obs(self):
+        """Return the observation"""
+        return {
+            "sensor": self._sensor,
+            "distance": self._distance,
+            "canMoveForward": self._can_move_forward,
+            "contacts": self._contacts
+        }
+    
+    def _simulate(self):
+        self._controller()
+        self.world.Step(TIME_STEP, VELOCITY_ITER, POSITION_ITER)
+
+    def _controller(self):
+#        self.robot.ApplyForceToCenter(force=(1, 1), wake=True)
+        pass
+
+    def robot_pos(self):
+        return np.array(self.robot.position)
+
+    def robot_dir(self):
+        return round(90 - degrees(self.robot.angle))
+
+    def sensor_dir(self) -> int:
+        return 0

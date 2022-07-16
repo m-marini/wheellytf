@@ -1,3 +1,3 @@
 # wheellytf
 
-Whelly Tensor Force
+Wheelly Tensor Force
