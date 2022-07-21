@@ -5,7 +5,7 @@ import numpy as np
 from numpy import ndarray
 from pygame import Surface
 
-from wheelly.robot import RobotAPI
+from wheelly.robots import RobotAPI
 
 WINDOW_SIZE = 800
 GRID_SIZE = 0.2
@@ -67,6 +67,7 @@ class RobotWindow:
         self._robot_pos = robot.robot_pos()
         self._robot_dir = robot.robot_dir()
         self._sensor_dir = robot.sensor_dir()
+        self._sensor_obstacle = robot.sensor_obstacle()
         return self
 
     def render(self):
@@ -75,6 +76,8 @@ class RobotWindow:
         trans = transMatrix()
         drawRobot(canvas, trans, self._robot_pos, self._robot_dir)
         drawSensor(canvas, trans, self._robot_pos, self._robot_dir, self._sensor_dir)
+        if self._sensor_obstacle:
+            drawObstacle(canvas, trans, self._sensor_obstacle)
 
         # The following line copies our drawings from `canvas` to the visible window
         self.window.blit(canvas, canvas.get_rect())
@@ -99,6 +102,21 @@ def drawRobot(canvas:Surface, trans:ndarray, robot_location:ndarray, robot_dir:i
     pygame.draw.polygon(
         canvas,
         ROBOT_COLOR,
+        shape
+    )
+
+def drawObstacle(canvas:Surface, trans:ndarray, location:ndarray):
+    """Draw the robot shape
+        
+    Arguments:
+    canvas -- the canvas
+    trans -- the transformation matrix
+    """
+    trans = translate(location) @ trans
+    shape = transform(trans, OBSTACLE_SHAPE)
+    pygame.draw.polygon(
+        canvas,
+        OBSTACLE_COLOR,
         shape
     )
 

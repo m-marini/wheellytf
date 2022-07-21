@@ -7,7 +7,7 @@ from tensorforce import Environment
 from wheelly.encoders import (ClipEncoder, DictEncoder, FeaturesEncoder,
                               GetEncoder, MergeEncoder, ScaleEncoder,
                               SupplyEncoder, TilesEncoder, createSpace)
-from wheelly.robot import RobotAPI
+from wheelly.robots import RobotAPI
 
 _logger = logging.getLogger(__name__)
 

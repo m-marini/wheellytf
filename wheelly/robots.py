@@ -10,10 +10,15 @@ import logging
 import re
 import socket
 import time
-from math import degrees, nan, pi, radians
+import numpy as np
+
+from math import degrees, pi, radians
 from typing import Any, Tuple
-from wheelly.utils import normalizeDeg, normalizeRad, clip, lin_map
+
 from Box2D import b2Body, b2Vec2, b2World
+
+from wheelly.sims import ObstacleMap
+from wheelly.utils import clip, lin_map, normalizeDeg, normalizeRad
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +79,9 @@ class RobotAPI:
     def sensor_dir(self) -> int:
         """Returns the sensor direction"""
         return self._sensor
+    
+    def sensor_obstacle(self) -> b2Vec2 | None:
+        return None
 
     def time(self):
         """Returns the robot time"""
@@ -84,7 +92,7 @@ class RobotAPI:
         return self._status;
 
 
-class Robot (RobotAPI):
+class Robot(RobotAPI):
     def __init__(self,
         robotHost:str ,
         robotPort: int,
@@ -241,6 +249,8 @@ ROBOT_LENGTH = 0.26
 _ROBOT_MASS = 0.78
 _ROBOT_DENSITY = _ROBOT_MASS / ROBOT_LENGTH / ROBOT_WIDTH
 _ROBOT_FRICTION = 0.3
+_MAX_DISTANCE = 3.0
+_SAFE_DISTANCE = 0.4
 
 _ROBOT_TRACK = 0.136
 _MAX_ACC = 1
@@ -257,7 +267,8 @@ _RAD_30 = radians(30)
 
 class SimRobot(RobotAPI):
     """Simulated robot"""
-    def __init__(self):
+
+    def __init__(self, obstacles: ObstacleMap):
         """Create a Rsimulated robot envinment"""
         super().__init__()
         world: b2World = b2World(gravity=(0,0), doSleep=True)
@@ -267,6 +278,7 @@ class SimRobot(RobotAPI):
             friction=_ROBOT_FRICTION)
         robot.angle = pi / 2
 
+        self._obstacles = obstacles
         self._distance = 0
         self._can_move_forward = 1
         self._can_move_backward = 1
@@ -321,6 +333,13 @@ class SimRobot(RobotAPI):
         self._controller(dt)
         self.world.Step(dt, _VELOCITY_ITER, _POSITION_ITER)
         self._time += dt
+        robot_pos = self._robot_pos
+        sensor_deg = normalizeDeg(90 - (self._robot_dir + self._sensor))
+        sensor_rad = radians(sensor_deg)
+        _, dist = self._obstacles.nearest(np.array([robot_pos.x, robot_pos.y]), sensor_rad)
+        self._distance = dist if dist < _MAX_DISTANCE else 0.0
+        self._can_move_forward = dist < _SAFE_DISTANCE
+        return self
 
     def close(self) -> RobotAPI:
         return self

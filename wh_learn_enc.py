@@ -7,7 +7,7 @@ from tensorforce.agents import Agent
 
 from wheelly.envs import EncodedRobotEnv, RobotEnv
 from wheelly.renders import WINDOW_SIZE, RobotWindow
-from wheelly.robot import Robot, SimRobot
+from wheelly.robots import Robot, SimRobot
 
 FONT_NAME = 'freesans'
 FONT_SIZE = 20

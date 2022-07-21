@@ -54,6 +54,9 @@ class ObstacleMap:
             if np.array_equal(o, location):
                 return True
         return False
+    
+    def size(self):
+        return self._size
 
 class ObstacleMapBuilder:
     """Obstacle map builder"""
