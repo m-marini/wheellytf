@@ -1,9 +1,7 @@
-import math
-import warnings
 from typing import TYPE_CHECKING, Optional
 
 import numpy as np
-from Box2D import b2World
+from Box2D import b2World, b2Vec2, b2Dot, b2Cross
 from Box2D.b2 import (circleShape, contactListener, edgeShape, fixtureDef,
                       polygonShape, revoluteJointDef)
 from gym.utils import EzPickle, colorize
@@ -39,3 +37,15 @@ def test_box2d():
     assert_allclose(robot.linearVelocity, (0, FORCE * TIME_STEP / ROBOT_MASS))
     assert_allclose(robot.position, (0, FORCE * TIME_STEP * TIME_STEP / ROBOT_MASS), rtol=1e-6)
     assert_allclose( robot.angle, 0)
+
+def test_dot():
+    a = b2Vec2(1,2)
+    b = b2Vec2(2,1)
+    c = b2Dot(a, b)
+    assert_equal(c, 4)
+
+def test_cross():
+    a = b2Vec2(1,2)
+    b = b2Vec2(2,1)
+    c = b2Cross(a, b)
+    assert_equal(c, 1*1-2*2)

@@ -1,0 +1,4 @@
+{
+    "environment": "wheelly.envs.RobotEnv",
+    "interval": 50e-3
+}

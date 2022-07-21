@@ -6,7 +6,8 @@ from tensorforce import Environment
 from tensorforce.agents import Agent
 
 from wheelly.envs import EncodedRobotEnv, RobotEnv
-from wheelly.pygame_utils import WINDOW_SIZE, RobotWindow
+from wheelly.renders import WINDOW_SIZE, RobotWindow
+from wheelly.robot import Robot, SimRobot
 
 FONT_NAME = 'freesans'
 FONT_SIZE = 20
@@ -16,16 +17,16 @@ font:pygame.font.Font | None = None
 def init_argparse() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         #usage="%(prog)s [OPTION] [FILE]...",
-        description="Run encoded robot environment."
+        description="Learn in encoded robot environment."
     )
     parser.add_argument(
         "-v", "--version", action="version",
         version = f"{parser.prog} version 0.1.0"
     )
     parser.add_argument(
-        "-e", "--environment", default='robot.json',
+        "-e", "--environment", default='environment.json',
         dest='environment',
-        help='the json file with environment descriptor (default=robot.json)'
+        help='the json file with environment descriptor (default=environment.json)'
     )
     parser.add_argument(
         "-m", "--model", default='saved-model',
@@ -35,6 +36,9 @@ def init_argparse() -> argparse.ArgumentParser:
     return parser
 
 def render_info(window: pygame.Surface, string: str):
+    logging.debug(string)
+
+def render_info1(window: pygame.Surface, string: str):
     text = font.render(string, True, (0, 0, 0))
     #get the rect of the text
     textRect = text.get_rect()
@@ -54,42 +58,41 @@ def main():
     font = pygame.font.SysFont(FONT_NAME, FONT_SIZE) 
 
     logging.info("Loading environment ...")
-    env1:RobotEnv = Environment.create(environment=args.environment)
+    #robot = SimRobot()
+    robot = Robot(
+        robotHost="192.168.1.11",
+        robotPort=22
+    )
+    env1:RobotEnv = Environment.create(environment=args.environment,
+        robot=robot)
 
     environment:EncodedRobotEnv = Environment.create(
         environment=EncodedRobotEnv,
         env=env1
     )
     logging.info("Loading agent ...")
-    agent = Agent.load(directory=args.model, environment=environment)
+    agent:Agent = Agent.load(directory=args.model,
+        environment=environment
+    )
 
     logging.info("Starting ...")
     states = environment.reset()
-    window = RobotWindow()
-    window.robot_pos(env1.robot_pos())
-    window.robot_dir(env1.robot_dir())
-    window.sensor_dir(env1.sensor_dir())
-    window.render()
+    window = RobotWindow() \
+        .set_robot(robot) \
+        .render()
 
     logging.info("Running ...")
-    tot_rew = 0.0
-    no_step = 0
     running = True
+    avg_rewards = 0.0
+    discount = 0.99
     while running:
         actions = agent.act(states=states)
         states, terminal, reward = environment.execute(actions=actions)
-        if no_step == 100:
-            tot_rew /= no_step
-            no_step = 1
-        no_step += 1
-        tot_rew += reward
+        avg_rewards = avg_rewards * discount + reward * (1 - discount)
         agent.observe(terminal=terminal, reward=reward)
 
-        window = RobotWindow()
-        window.robot_pos(env1.robot_pos())
-        window.robot_dir(env1.robot_dir())
-        window.sensor_dir(env1.sensor_dir())
-        window.render()
+        window.set_robot(robot).render()
+        render_info(window=window, string=f"Average {avg_rewards:.2f}")
 
          #   render_info(env1.window, f"Average reward {tot_rew / no_step}")
         for event in pygame.event.get():
@@ -102,6 +105,18 @@ def main():
     logging.info("Closing environment ...")
     environment.close()
     logging.info("Completed.")
+
+def dummy():
+    agent:Agent = Agent.load(directory=args.model,
+        environment=environment,
+        summarizer=dict(
+            directory='tensorboard',
+            # list of labels, or 'all'
+            labels=['entropy', 'kl-divergence', 'loss', 'reward', 'update-norm']
+            #labels=['all']
+        )
+    )
+
 
 if __name__ == '__main__':
     main()

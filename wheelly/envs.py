@@ -1,25 +1,23 @@
 import logging
-from time import time
 from typing import Any
 
 import numpy as np
-from Box2D import b2World, b2Body, b2Vec2
 from tensorforce import Environment
 
 from wheelly.encoders import (ClipEncoder, DictEncoder, FeaturesEncoder,
                               GetEncoder, MergeEncoder, ScaleEncoder,
                               SupplyEncoder, TilesEncoder, createSpace)
+from wheelly.robot import RobotAPI
 
-from math import degrees, pi
-from . import robot
+_logger = logging.getLogger(__name__)
 
-logger = logging.getLogger(__name__)
+_REACTION_INTERVAL = 0.3
+_COMMAND_INTERVAL = 0.9
+_DEFAULT_INTERVAL = 0.01
+_VELOCITY_THRESHOLD = 0.01
 
-REACTION_INTERVAL = 0.3
-COMMAND_INTERVAL = 0.9
-
-MIN_SENSOR = -90
-MAX_SENSOR = 90
+MIN_SENSOR_DIR = -90
+MAX_SENSOR_DIR = 90
 MIN_DISTANCE = 0.0
 MAX_DISTANCE = 10.0
 NUM_CONTACT_VALUES = 16
@@ -41,8 +39,8 @@ _BASE_STATES = {
     "sensor": {
         "type": 'float',
                 "shape": (1,),
-                "min_value": float(MIN_SENSOR),
-                "max_value": float(MAX_SENSOR)},
+                "min_value": float(MIN_SENSOR_DIR),
+                "max_value": float(MAX_SENSOR_DIR)},
     "distance": {
         "type": 'float',
                 "shape": (1,),
@@ -76,11 +74,20 @@ _BASE_ACTION = {
     "sensorAction": {
         "type": 'float',
         "shape": (1,),
-        "min_value": float(MIN_SENSOR),
-        "max_value": float(MAX_SENSOR)}
+        "min_value": float(MIN_SENSOR_DIR),
+        "max_value": float(MAX_SENSOR_DIR)}
 }
 
+HALT_ACTION = {
+    "halt": np.ones((1,)),
+    "direction": np.zeros((1,)),
+    "speed": np.zeros((1,)),
+    "sensorAction": np.zeros((1,))
+}
+"""The halt base action"""
+
 class MockRobotEnv(Environment):
+    """Mock robot environment used for code testing """
     def __init__(self):
         """Create a Robot envinment
         
@@ -102,29 +109,27 @@ class MockRobotEnv(Environment):
         return _BASE_ACTION
 
     def reset(self):
-        """Reset the environment and return the tuple with observation and info """
         return self._get_obs()
 
     def execute(self, actions):
-        """Run a step for the environment and return the tuple with observation, reward, done flag, info
-
-        Argument:
-        action -- (Action) the action to perfom
-        """
         self._action = actions
         observation = self._get_obs()
         return observation, False, self._reward
 
     def set_distance(self, value: float):
+        """Set the distance for states"""
         self._distance = np.array(value)
 
     def set_sensor(self, value: int):
+        """Set the sensor direction for states"""
         self._sensor = np.array(value)
 
     def set_can_move_forward(self, value: int):
+        """Set true if robot can move forward"""
         self._can_move_forward = np.array(value)
 
     def act(self):
+        """Returns the action of last execute method invocation"""
         return self._action
 
     def _get_obs(self):
@@ -137,30 +142,40 @@ class MockRobotEnv(Environment):
         }
 
 class RobotEnv(Environment):
-    def __init__(self, **kvargs):
-        """Create a Robot envinment
+    """Base robot environment"""
+    def __init__(self, robot: RobotAPI,
+        interval = _DEFAULT_INTERVAL,
+        reactionInterval = _REACTION_INTERVAL,
+        commandInterval = _COMMAND_INTERVAL):
+        """Creates a Robot envinment
         
         Argument:
-        params -- (dict) the dictionary with parameters
+        robot -- the robot api interface
+        interval -- the interval between robot api ticks
+        reactionInterval -- the (action/state) reaction interval (sec)
+        commandInterval -- the interval between commands (sec)
         """
         super().__init__()
-        self._robot = robot.Robot(**kvargs)
-        self._reaction_interval = kvargs["reactionInterval"] if "rectionInterval" in kvargs else REACTION_INTERVAL
-        self._command_interval = kvargs["commandInterval"] if "commandInterval" in kvargs else COMMAND_INTERVAL - \
-            self._reaction_interval
-        self._connected = False
+        self._robot = robot
+        self._reaction_interval = reactionInterval
+        self._command_interval = commandInterval
+        self._interval = interval
+        
+        self._started = False
+        
         self._robot_location = np.zeros((2,))
         self._robot_dir = np.zeros((1,))
         self._sensor = np.zeros((1,))
         self._distance = np.array([MAX_DISTANCE])
         self._can_move_forward = np.array([1])
         self._contacts = np.array([0])
-        self._last_move_cmd = None
-        self._last_scan_cmd = None
+
+        self._prev_halt = True
+        self._prev_dir = 0
+        self._prev_speed = 0.0
+        self._prev_sensor = 0
         self._last_move_timestamp = None
         self._last_scan_timestamp = None
-        self._status_timeout = 0
-        self.window = None
 
     def states(self):
         return _BASE_STATES
@@ -178,44 +193,49 @@ class RobotEnv(Environment):
         return _BASE_ACTION
 
     def reset(self):
-        """Reset the environment and return the tuple with observation and info """
-        if not self._connected:
-            self._robot.connect()
-            self._connected = True
-        status = self._readStatus()
-        self._status_timeout = status["timestamp"] + self._reaction_interval
+        if not self._started:
+            self._robot.start()
+            self._started = True
+        self._readStatus(0)
         return self._get_obs()
 
     def execute(self, actions):
-        """Run a step for the environment and return the tuple with observation, reward, done flag, info
-
-        Argument:
-        action -- (Action) the action to perfom
-        """
         self._process_action(actions)
-        status = self._readStatus()
-        self._status_timeout += self._reaction_interval
-
+        status = self._readStatus(self._reaction_interval)
+        
         reward = self._reward(status)
 
         observation = self._get_obs()
         return observation, False, reward
 
     def close(self):
-        """Close the environment"""
         if self._robot != None:
             self._robot.close()
 
-    def _reward(self, status: dict[str, Any]):
+    def _reward(self, status: dict[str, Any]) -> float:
+        """Reward function"""
+        if self._can_move_forward[0] == 0 or status["canMoveBackward"] == 0:
+            return -1
+        elif abs(status["left"]) < _VELOCITY_THRESHOLD and abs(status["right"]) < _VELOCITY_THRESHOLD and self._sensor == 0:
+            return 1
+        else:
+            return 0
+        """
         return -1 if self._can_move_forward[0] == 0 \
             or status["canMoveBackward"] == 0 else \
             1 if status["left"] == 0 and status["right"] == 0 and self._sensor == 0 else \
             0
-
-    def _readStatus(self):
+"""
+    def _readStatus(self, time: float):
+        """Reads the status of robot afetr a time interval
+        
+        Arguments:
+        time -- the time interval (sec)"""
+        timeout = self._robot.time() + time
         while True:
-            status = self._robot.read_status()
-            if status != None and status["timestamp"] >= self._status_timeout:
+            self._robot.tick(self._interval)
+            status = self._robot.status()
+            if status != None and self._robot.time() >= timeout:
                 break
         self._store_status(status)
         return status
@@ -229,7 +249,7 @@ class RobotEnv(Environment):
             "contacts": self._contacts
         }
 
-    def _store_status(self, status):
+    def _store_status(self, status: dict[str, Any]):
         """Store the status of robot
         
         Argument:
@@ -246,24 +266,45 @@ class RobotEnv(Environment):
             [status["canMoveBackward"]], dtype=np.uint8)
         self._contacts = np.array([status["contacts"]], dtype=np.uint8)
 
-    def _process_action(self, action):
-        """Process the action"""
-        now = time()
-        dir = self._robot_dir + action['direction']
-        moveCmd = "al" if action["halt"] == 1 else f"mv {dir[0]:.0f} {action['speed'][0]:.1f}"
-        if self._last_move_cmd != moveCmd:
-            self._last_move_cmd = self._robot.write_cmd(moveCmd)
-            self._last_move_timestamp = now
-        elif moveCmd != "al" and now >= self._last_move_timestamp + self._command_interval:
-            self._last_move_cmd = self._robot.write_cmd(moveCmd)
-            self._last_move_timestamp = now
+    def _process_action(self, action: dict[str, np.ndarray]):
+        """Process the action
+        
+        Argument:
+        action -- the action from agent
+        """
+        now = self._robot.time()
+        dir = int(self._robot_dir + action['direction'])
+        speed = round(action['speed'][0], 1)
+        is_halt = action['halt'] == 1
+        if is_halt != self._prev_halt:
+            self._prev_halt = is_halt
+            if is_halt:
+                self._robot.halt()
+                self._last_move_timestamp = now
+            else:
+                self._robot.move(dir, speed)
+                self._prev_dir = dir
+                self._prev_speed = speed
+                self._last_move_timestamp = now
+        elif not is_halt and now >= self._last_move_timestamp + self._command_interval:
+            self._prev_halt = is_halt
+            if is_halt:
+                self._robot.halt()
+                self._last_move_timestamp = now
+            else:
+                self._robot.move(dir, speed)
+                self._prev_dir = dir
+                self._prev_speed = speed
+                self._last_move_timestamp = now
 
-        scanCmd = f"sc {action['sensorAction'][0]:.0f}"
-        if self._last_scan_cmd != scanCmd:
-            self._last_scan_cmd = self._robot.write_cmd(scanCmd)
+        sensor = round(action['sensorAction'][0])
+        if self._prev_sensor != sensor:
+            self._robot.scan(sensor)
+            self._prev_sensor = sensor
             self._last_scan_timestamp = now
-        elif scanCmd != "sc 0" and now >= self._last_scan_timestamp + self._command_interval:
-            self._last_scan_cmd = self._robot.write_cmd(scanCmd)
+        elif sensor != 0 and now >= self._last_scan_timestamp + self._command_interval:
+            self._robot.scan(sensor)
+            self._prev_sensor = sensor
             self._last_scan_timestamp = now
 
 _ENCODED_ACTION = {
@@ -286,7 +327,17 @@ _ENCODED_ACTION = {
 }
 
 class EncodedRobotEnv(Environment):
-    def __init__(self, env: Environment):
+    """Encoded environment wrapper to base robot environment
+    The environment encodes the state using tiles features for the sensor signals
+    and features for contacts and canMoveForward signals
+    The actions are discretized
+    """
+    def __init__(self, env: RobotEnv):
+        """Creates the wrapper
+        
+        Arguments:
+        env -- the base robot environment
+        """
         super().__init__()
         states_space = createSpace(env.states())
         obs_encoder = SupplyEncoder(states_space, lambda: self._obs)
@@ -311,8 +362,8 @@ class EncodedRobotEnv(Environment):
                              np.array([MIN_SPEED]),
                              np.array([MAX_SPEED]))
         sensor = ScaleEncoder(GetEncoder(in_act_encoder, "sensorAction"),
-                              np.array([MIN_SENSOR]),
-                              np.array([MAX_SENSOR]))
+                              np.array([MIN_SENSOR_DIR]),
+                              np.array([MAX_SENSOR_DIR]))
         out_act_encoder = DictEncoder(
             halt=halt,
             direction=direction,
@@ -330,113 +381,31 @@ class EncodedRobotEnv(Environment):
         return _ENCODED_ACTION
 
     def reset(self):
-        """Reset the environment and return the tuple with observation and info """
         return self._convert_observation(self._env.reset())
 
     def execute(self, actions):
-        """Run a step for the environment and return the tuple with observation, reward, done flag, info
-
-        Argument:
-        action -- (Action) the action to perfom
-        """
         obs, done, reward = self._env.execute(self._convert_action(actions))
         return self._convert_observation(obs), done, reward
 
     def close(self):
-        """Close the environment"""
         self._env.close()
 
-    def _convert_observation(self, obs: Any):
+    def _convert_observation(self, obs: dict[str, Any]) -> dict[str, np.ndarray]:
+        """Returns the encoded states observation
+        
+        Argument:
+        obs -- the base observation
+        """
         self._obs = obs
         return self._encoder.encode()
 
-    def _convert_action(self, act: Any):
+    def _convert_action(self, act: dict[str, np.ndarray]):
+        """Returns the decoded action
+        
+        Argument:
+        act -- the base action
+        """
         self._act = act
         return self._out_act_encoder.encode()
 
-ROBOT_WIDTH = 0.18
-ROBOT_LENGTH = 0.26
-ROBOT_MASS = 0.78
-ROBOT_DENSITY = ROBOT_MASS / ROBOT_LENGTH / ROBOT_WIDTH
-ROBOT_FRICTION = 0.3
-ROBOT_TRACK = 0.136
-
-MAX_ACC = 1
-MAX_FORCE = MAX_ACC * ROBOT_MASS
-MAX_VELOCITY = 0.280
-
-VELOCITY_ITER = 10
-POSITION_ITER = 10
-TIME_STEP = 0.3
-
-class SimRobotEnv(Environment):
-    def __init__(self):
-        """Create a Rsimulated robot envinment
-        
-        Argument:
-        params -- (dict) the dictionary with parameters
-        """
-        super().__init__()
-
-        self._sensor = np.zeros((1,))
-        self._distance = np.array([MAX_DISTANCE])
-        self._can_move_forward = np.array([1])
-        self._contacts = np.array([0])
-        self._reward = np.zeros((1,))
-        world:b2World = b2World(gravity=(0,0), doSleep=True)
-        robot:b2Body = world.CreateDynamicBody(position=(0,0))
-        box = robot.CreatePolygonFixture(box=(ROBOT_WIDTH / 2, ROBOT_LENGTH/ 2), density=ROBOT_DENSITY, friction=ROBOT_FRICTION)
-        robot.angle = pi / 2
-        self.world = world
-        self.robot = robot
-        self.robotBox = box
-
-    def states(self):
-        return _BASE_STATES
-
-    def actions(self):
-        return _BASE_ACTION
-
-    def reset(self):
-        """Reset the environment and return the tuple with observation and info """
-        return self._get_obs()
-
-    def execute(self, actions):
-        """Run a step for the environment and return the tuple with observation, reward, done flag, info
-
-        Argument:
-        action -- (Action) the action to perfom
-        """
-        self._action = actions
-        self._simulate()
-        observation = self._get_obs()
-        return observation, False, self._reward
-
-    def act(self):
-        return self._action
-
-    def _get_obs(self):
-        """Return the observation"""
-        return {
-            "sensor": self._sensor,
-            "distance": self._distance,
-            "canMoveForward": self._can_move_forward,
-            "contacts": self._contacts
-        }
-    
-    def _simulate(self):
-        self._controller()
-        self.world.Step(TIME_STEP, VELOCITY_ITER, POSITION_ITER)
-
-    def _controller(self):
-#        self.robot.ApplyForceToCenter(force=(1, 1), wake=True)
-        pass
-
-    def robot_pos(self):
-        return np.array(self.robot.position)
-
-    def robot_dir(self):
-        return round(90 - degrees(self.robot.angle))
-
-    def sensor_dir(self) -> int:
-        return 0
+_logger.debug(f"Module {__name__} loaded.")
