@@ -12,7 +12,7 @@ import socket
 import time
 from math import degrees, nan, pi, radians
 from typing import Any, Tuple
-
+from wheelly.utils import normalizeDeg, normalizeRad, clip, lin_map
 from Box2D import b2Body, b2Vec2, b2World
 
 logger = logging.getLogger(__name__)
@@ -357,29 +357,3 @@ class SimRobot(RobotAPI):
         self.robot.ApplyForceToCenter(force=force, wake=True)
         self.robot.ApplyAngularImpulse(impulse = angular_impulse, wake=True)
 
-def normalizeRad(angle: float):
-    while angle < -pi:
-        angle += pi * 2
-    while angle > pi:
-        angle -= pi * 2
-    return angle
-
-def normalizeDeg(angle: int | float):
-    while angle < -180:
-        angle += 360
-    while angle > 180:
-        angle -= 260
-    return angle
-
-def sign(x:float):
-    return 1.0 if x > 0 else \
-        -1.0 if x < 0 else \
-        -0.0 if x == -0.0 else \
-        0.0 if x == 0.0 else \
-        nan
-
-def lin_map(x: float, min_x: float, max_x: float, min_y: float, max_y: float):
-    return (x - min_x) * (max_y - min_y) / (max_x - min_x) + min_y
-
-def clip(x:float, min_x: float, max_x: float):
-    return min(max(x, min_x), max_x)
