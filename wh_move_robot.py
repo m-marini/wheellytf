@@ -14,17 +14,20 @@ def main():
         robotPort=22
     )
 
-    r.connect()
-    r.read_status()
+    r.start()
+    dt = 0.1
+    r.tick(dt)
 
     test_timeout = time.time() + TEST_DURATION
     cmd_timeout = 0
+    prev = time.time()
     while time.time() < test_timeout:
         t = time.time()
         if t >= cmd_timeout:
             r.move(0, 1)
             cmd_timeout = t + CMD_INTERVAL
-        s = r.read_status()
+        r.tick(dt)
+        s = r.status()
         #logging.debug(f"status={s}")
 
     r.halt()

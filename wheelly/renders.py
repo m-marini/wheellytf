@@ -5,6 +5,8 @@ import numpy as np
 from numpy import ndarray
 from pygame import Surface
 
+from wheelly.robot import RobotAPI
+
 WINDOW_SIZE = 800
 GRID_SIZE = 0.2
 ROBOT_WIDTH = 0.18
@@ -51,12 +53,21 @@ class RobotWindow:
     
     def robot_pos(self, robot_location:ndarray):
         self._robot_pos = robot_location
+        return self
 
     def robot_dir(self, robot_dir:int):
         self._robot_dir = robot_dir
+        return self
 
     def sensor_dir(self, sensor_dir:int):
         self._sensor_dir = sensor_dir
+        return self
+
+    def set_robot(self, robot: RobotAPI):
+        self._robot_pos = robot.robot_pos()
+        self._robot_dir = robot.robot_dir()
+        self._sensor_dir = robot.sensor_dir()
+        return self
 
     def render(self):
         canvas = pygame.Surface((WINDOW_SIZE, WINDOW_SIZE))
@@ -69,6 +80,7 @@ class RobotWindow:
         self.window.blit(canvas, canvas.get_rect())
         pygame.event.pump()
         pygame.display.update()
+        return self
     
 def transMatrix():
     """Return the transform matrix to render the shapes"""

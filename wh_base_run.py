@@ -5,8 +5,8 @@ from tensorforce import Environment
 from tensorforce.agents import Agent
 
 from wheelly.envs import RobotEnv
-from wheelly.pygame_utils import RobotWindow
-
+from wheelly.renders import RobotWindow
+from wheelly.robot import Robot
 
 def constant_agent(environment):
     return Agent.create(
@@ -37,20 +37,23 @@ def main():
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s %(name)s: %(message)s')
     logging.getLogger("wheelly.envs.robot").setLevel(logging.DEBUG)
 
-    environment:RobotEnv = Environment.create(
-        environment=RobotEnv,
+    #robot = SimRobot()
+    robot = Robot(
         robotHost="192.168.1.11",
         robotPort=22
     )
 
-    agent:Agent = constant_agent(environment)
+    environment:RobotEnv = Environment.create(
+        environment=RobotEnv,
+        robot=robot
+    )
+
+    agent:Agent = random_agent(environment)
 
     states = environment.reset()
-    window = RobotWindow()
-    window.robot_pos(environment.robot_pos())
-    window.robot_dir(environment.robot_dir())
-    window.sensor_dir(environment.sensor_dir())
-    window.render()
+    window = RobotWindow() \
+        .set_robot(robot) \
+        .render()
 
     running = True
     while running:
@@ -58,10 +61,9 @@ def main():
         states, terminal, reward = environment.execute(actions=actions)
         agent.observe(terminal=terminal, reward=reward)
         
-        window.robot_pos(environment.robot_pos())
-        window.robot_dir(environment.robot_dir())
-        window.sensor_dir(environment.sensor_dir())
-        window.render()
+        window = RobotWindow() \
+            .set_robot(robot) \
+            .render()
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
