@@ -1,6 +1,6 @@
 import re
 
-import wheelly.robot as robot
+import wheelly.robots as robots
 
 
 def test_re():
