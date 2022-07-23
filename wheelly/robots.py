@@ -10,10 +10,15 @@ import logging
 import re
 import socket
 import time
-from math import degrees, nan, pi, radians
+import numpy as np
+
+from math import cos, degrees, pi, radians, sin
 from typing import Any, Tuple
 
 from Box2D import b2Body, b2Vec2, b2World
+
+from wheelly.sims import ObstacleMap
+from wheelly.utils import clip, lin_map, normalizeDeg, normalizeRad
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +32,7 @@ class RobotAPI:
         self._robot_dir = 0
         self._sensor = 0
         self._time = 0.0
+        self._distance = 0.0
         self._status: dict[str, Any]= {}
 
     def start(self):
@@ -75,16 +81,31 @@ class RobotAPI:
         """Returns the sensor direction"""
         return self._sensor
 
+    def sensor_distance(self) -> float:
+        return self._distance
+
+    def sensor_obstacle(self) -> b2Vec2 | None:
+        if self._distance > 0:
+            d = self._distance
+            angle = radians(90 - self._robot_dir - self._sensor)
+            return b2Vec2(d * cos(angle), d * sin(angle)) + self._robot_pos
+        else:
+            return None
+
     def time(self):
         """Returns the robot time"""
         return self._time
 
     def status(self):
         """Returns the robot status"""
-        return self._status;
+        return self._status
+    
+    def obstaclesMap(self)-> ObstacleMap | None:
+        """Returns the obstacle map if any"""
+        return None
 
 
-class Robot (RobotAPI):
+class Robot(RobotAPI):
     def __init__(self,
         robotHost:str ,
         robotPort: int,
@@ -241,6 +262,8 @@ ROBOT_LENGTH = 0.26
 _ROBOT_MASS = 0.78
 _ROBOT_DENSITY = _ROBOT_MASS / ROBOT_LENGTH / ROBOT_WIDTH
 _ROBOT_FRICTION = 0.3
+_MAX_DISTANCE = 3.0
+_SAFE_DISTANCE = 0.4
 
 _ROBOT_TRACK = 0.136
 _MAX_ACC = 1
@@ -257,7 +280,8 @@ _RAD_30 = radians(30)
 
 class SimRobot(RobotAPI):
     """Simulated robot"""
-    def __init__(self):
+
+    def __init__(self, obstacles: ObstacleMap):
         """Create a Rsimulated robot envinment"""
         super().__init__()
         world: b2World = b2World(gravity=(0,0), doSleep=True)
@@ -267,6 +291,7 @@ class SimRobot(RobotAPI):
             friction=_ROBOT_FRICTION)
         robot.angle = pi / 2
 
+        self._obstacles = obstacles
         self._distance = 0
         self._can_move_forward = 1
         self._can_move_backward = 1
@@ -281,12 +306,6 @@ class SimRobot(RobotAPI):
 
     def start(self):
         return self
-
-    def robot_pos(self) -> b2Vec2:
-        return self.robot.position
-
-    def robot_dir(self):
-        return normalizeDeg(round(90 - degrees(self.robot.angle)))
 
     def move(self, dir: int, speed: float):
         self._direction = dir
@@ -316,11 +335,24 @@ class SimRobot(RobotAPI):
             "canMoveForward": self._can_move_forward,
             "canMoveBackward": self._can_move_backward,
         }
+    
+    def obstaclesMap(self) -> ObstacleMap | None:
+        return self._obstacles
 
     def tick(self, dt:float):
         self._controller(dt)
         self.world.Step(dt, _VELOCITY_ITER, _POSITION_ITER)
         self._time += dt
+        self._robot_pos = self.robot.position
+        self._robot_dir = normalizeDeg(round(90 - degrees(self.robot.angle)))
+        robot_pos = self._robot_pos
+        sensor_deg = normalizeDeg(90 - self._robot_dir - self._sensor)
+        sensor_rad = radians(sensor_deg)
+        _, dist = self._obstacles.nearest(location=np.array([robot_pos.x, robot_pos.y]),
+            dir_rad=sensor_rad)
+        self._distance = dist if dist < _MAX_DISTANCE else 0.0
+        self._can_move_forward = dist < _SAFE_DISTANCE
+        return self
 
     def close(self) -> RobotAPI:
         return self
@@ -357,29 +389,3 @@ class SimRobot(RobotAPI):
         self.robot.ApplyForceToCenter(force=force, wake=True)
         self.robot.ApplyAngularImpulse(impulse = angular_impulse, wake=True)
 
-def normalizeRad(angle: float):
-    while angle < -pi:
-        angle += pi * 2
-    while angle > pi:
-        angle -= pi * 2
-    return angle
-
-def normalizeDeg(angle: int | float):
-    while angle < -180:
-        angle += 360
-    while angle > 180:
-        angle -= 260
-    return angle
-
-def sign(x:float):
-    return 1.0 if x > 0 else \
-        -1.0 if x < 0 else \
-        -0.0 if x == -0.0 else \
-        0.0 if x == 0.0 else \
-        nan
-
-def lin_map(x: float, min_x: float, max_x: float, min_y: float, max_y: float):
-    return (x - min_x) * (max_y - min_y) / (max_x - min_x) + min_y
-
-def clip(x:float, min_x: float, max_x: float):
-    return min(max(x, min_x), max_x)

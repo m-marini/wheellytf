@@ -6,7 +6,7 @@ from tensorforce.agents import Agent
 
 from wheelly.envs import RobotEnv
 from wheelly.renders import RobotWindow
-from wheelly.robot import Robot
+from wheelly.robots import Robot
 
 def constant_agent(environment):
     return Agent.create(

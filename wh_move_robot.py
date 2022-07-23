@@ -1,7 +1,7 @@
 import logging
 import time
 
-import wheelly.robot as robot
+import wheelly.robots as robots
 
 TEST_DURATION = 2
 CMD_INTERVAL = 0.8
@@ -9,7 +9,7 @@ CMD_INTERVAL = 0.8
 def main():
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(name)s: %(message)s')
 
-    r = robot.Robot(
+    r = robots.Robot(
         robotHost="192.168.1.11",
         robotPort=22
     )

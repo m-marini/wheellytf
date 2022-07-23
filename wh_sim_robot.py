@@ -4,7 +4,8 @@ from typing import Any, Callable
 import pygame
 
 from wheelly.renders import RobotWindow
-from wheelly.robot import Robot, SimRobot
+from wheelly.robots import SimRobot
+from wheelly.sims import ObstacleMapBuilder
 
 FPS = 60
 
@@ -35,27 +36,33 @@ def concat(*behaviors: Callable[[int], Any]) -> Callable[[int], Any]:
 
 def main():
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(name)s: %(message)s')
-    env = SimRobot()
-    window = RobotWindow().set_robot(env).render()
+    obs = ObstacleMapBuilder(size=0.2) \
+        .rect((-5., -5.), (5., 5.)) \
+        .add((1, 0)) \
+        .build()
+    robot = SimRobot(obs)
+    window = RobotWindow().set_robot(robot).render()
     behavior = concat(
-        move(env, 0, 4, 90, 1),
-        scan(env, 1, 3, 90)
+        move(robot, 0, 4, 90, 1),
+        scan(robot, 1, 3, 90)
     )
 
-    env.start()
+    robot.start()
     running = True
-    true_clock = False
-    clock = pygame.time.Clock()
     t = 0
     dt = 0.01
+    tf = int(1000 / FPS)
+    next_frame = tf
+    sync_wait = 2
     while running:
-        clock.tick(FPS)
-        for _ in range(0, 100):
-            t += dt
-            behavior(t)
-            env.tick(dt)
-
-        window.set_robot(env).render()
+        t += dt
+        behavior(t)
+        robot.tick(dt)
+        if int(t * 1000) >= next_frame - sync_wait:
+            tt = pygame.time.get_ticks()
+            pygame.time.wait(next_frame - tt)
+            window.set_robot(robot).render()
+            next_frame += tf
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:

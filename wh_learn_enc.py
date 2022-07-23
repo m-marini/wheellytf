@@ -7,7 +7,7 @@ from tensorforce.agents import Agent
 
 from wheelly.envs import EncodedRobotEnv, RobotEnv
 from wheelly.renders import WINDOW_SIZE, RobotWindow
-from wheelly.robot import Robot, SimRobot
+from wheelly.robots import Robot, SimRobot
 
 FONT_NAME = 'freesans'
 FONT_SIZE = 20
@@ -58,11 +58,12 @@ def main():
     font = pygame.font.SysFont(FONT_NAME, FONT_SIZE) 
 
     logging.info("Loading environment ...")
-    #robot = SimRobot()
-    robot = Robot(
-        robotHost="192.168.1.11",
-        robotPort=22
-    )
+
+    robot = SimRobot()
+#    robot = Robot(
+#        robotHost="192.168.1.11",
+#        robotPort=22
+#    )
     env1:RobotEnv = Environment.create(environment=args.environment,
         robot=robot)
 
