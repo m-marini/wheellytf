@@ -15,7 +15,7 @@ import numpy as np
 from math import cos, degrees, pi, radians, sin
 from typing import Any, Tuple
 
-from Box2D import b2Body, b2Vec2, b2World, b2PolygonShape
+from Box2D import b2Body, b2Vec2, b2World, b2PolygonShape, b2EdgeShape, b2FixtureDef, b2Contact, b2ContactListener
 
 from wheelly.sims import ObstacleMap
 from wheelly.utils import clip, lin_map, normalizeDeg, normalizeRad
@@ -34,6 +34,7 @@ class RobotAPI:
         self._sensor = 0
         self._time = 0.0
         self._distance = 0.0
+        self._contacts = 0
         self._status: dict[str, Any]= {}
 
     def start(self):
@@ -84,6 +85,9 @@ class RobotAPI:
 
     def sensor_distance(self) -> float:
         return self._distance
+    
+    def contacts(self):
+        return self._contacts
 
     def sensor_obstacle(self) -> b2Vec2 | None:
         if self._distance > 0:
@@ -156,6 +160,8 @@ class Robot(RobotAPI):
                     self._robot_pos = b2Vec2(status['x'], status['y'])
                     self._sensor = status['sensor']
                     self._time = status['timestamp']
+                    self._contacts = status['contacts']
+                    self._distance = status['dist']
                 else:
                     self._time = time.time()
         return self
@@ -280,18 +286,64 @@ _TRACK = 0.136
 _RAD_10 = radians(10)
 _RAD_30 = radians(30)
 
-class SimRobot(RobotAPI):
+_SENSOR_GAP = 0.01
+
+_FRONT_LEFT = [
+    (_SENSOR_GAP, ROBOT_WIDTH / 2 + _SENSOR_GAP),
+    (ROBOT_LENGTH / 2 + _SENSOR_GAP, ROBOT_WIDTH / 2 + _SENSOR_GAP),
+    (ROBOT_LENGTH / 2 + _SENSOR_GAP, _SENSOR_GAP)
+]
+_FRONT_RIGHT = [
+    (_SENSOR_GAP, -ROBOT_WIDTH / 2 - _SENSOR_GAP),
+    (ROBOT_LENGTH / 2 + _SENSOR_GAP, -ROBOT_WIDTH / 2 - _SENSOR_GAP),
+    (ROBOT_LENGTH / 2 + _SENSOR_GAP, -_SENSOR_GAP)
+]
+_REAR_LEFT = [
+    (-_SENSOR_GAP, ROBOT_WIDTH / 2 + _SENSOR_GAP),
+    (-ROBOT_LENGTH / 2 - _SENSOR_GAP, ROBOT_WIDTH / 2 + _SENSOR_GAP),
+    (-ROBOT_LENGTH / 2 - _SENSOR_GAP, _SENSOR_GAP)
+]
+_REAR_RIGHT = [
+    (-_SENSOR_GAP, -ROBOT_WIDTH / 2 - _SENSOR_GAP),
+    (-ROBOT_LENGTH / 2 - _SENSOR_GAP, -ROBOT_WIDTH / 2 - _SENSOR_GAP),
+    (-ROBOT_LENGTH / 2 - _SENSOR_GAP, -_SENSOR_GAP)
+]
+
+class MyListener(b2ContactListener):
+    def __init__(self):
+        b2ContactListener.__init__(self)
+
+
+
+class SimRobot(RobotAPI, b2ContactListener):
     """Simulated robot"""
 
     def __init__(self, obstacles: ObstacleMap):
         """Create a Rsimulated robot envinment"""
-        super().__init__()
-        world: b2World = b2World(gravity=(0,0), doSleep=True)
+        RobotAPI.__init__(self)
+        b2ContactListener.__init__(self)
+
+        world: b2World = b2World(gravity=(0,0), doSleep=True,
+            contactListener=self)
         robot: b2Body = world.CreateDynamicBody(position=(0,0))
-        box = robot.CreatePolygonFixture(box=(ROBOT_WIDTH / 2, ROBOT_LENGTH/ 2),
+
+        robot.CreatePolygonFixture(box=(ROBOT_WIDTH / 2, ROBOT_LENGTH/ 2),
             density=_ROBOT_DENSITY,
             friction=_ROBOT_FRICTION,
             restitution=_ROBOT_RESTITUTION)
+        self._fl_sens = robot.CreateChainFixture(
+            vertices=_FRONT_LEFT,
+            isSensor=True)
+        self._fr_sens = robot.CreateChainFixture(
+            vertices=_FRONT_RIGHT,
+            isSensor=True)
+        self._rl_sens = robot.CreateChainFixture(
+            vertices=_REAR_LEFT,
+            isSensor=True)
+        self._rr_sens = robot.CreateChainFixture(
+            vertices=_REAR_RIGHT,
+            isSensor=True)
+
         robot.angle = pi / 2
 
         for i in range(0, obstacles.num_obstacles()):
@@ -303,17 +355,13 @@ class SimRobot(RobotAPI):
         )
 
         self._obstacles = obstacles
-        self._distance = 0
+        self._speed = 0.0
         self._can_move_forward = 1
         self._can_move_backward = 1
         self._left = 0
         self._right = 0
-        self._contacts = 0
         self.world = world
         self.robot = robot
-        self.robotBox = box
-        self._direction = 0
-        self._speed = 0.0
 
     def start(self):
         return self
@@ -401,3 +449,29 @@ class SimRobot(RobotAPI):
         self.robot.ApplyForceToCenter(force=force, wake=True)
         self.robot.ApplyAngularImpulse(impulse = angular_impulse, wake=True)
 
+    def _contactValue(self, contact: b2Contact):
+        fa = contact.fixtureA
+        fb = contact.fixtureB
+        if fa == self._fl_sens or fb == self._fl_sens:
+            return 8
+        elif fa == self._fr_sens or fb == self._fr_sens:
+            return 4
+        elif fa == self._rl_sens or fb == self._rl_sens:
+            return 2
+        elif fa == self._rr_sens or fb == self._rr_sens:
+            return 1
+        return 0
+
+    def BeginContact(self, contact: b2Contact):
+        value = self._contactValue(contact=contact)
+        self._contacts |= value
+
+    def EndContact(self, contact):
+        value = self._contactValue(contact=contact)
+        self._contacts &= ~value
+
+def _createSensor(robot:b2Body, vertices:list[tuple[float, float]], userData: Any):
+    return robot.CreateChainFixture(vertices=vertices,
+        isSensor=True,
+        userData=userData
+        )

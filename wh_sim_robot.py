@@ -41,7 +41,7 @@ def main():
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(name)s: %(message)s')
     obs = ObstacleMapBuilder(size=0.2) \
         .rect((-5., -5.), (5., 5.)) \
-        .add((1, 0)) \
+        .add((0.4, 0)) \
         .build()
     robot = SimRobot(obs)
     window = RobotWindow().set_robot(robot).render()
