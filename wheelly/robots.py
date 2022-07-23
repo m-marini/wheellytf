@@ -15,7 +15,7 @@ import numpy as np
 from math import cos, degrees, pi, radians, sin
 from typing import Any, Tuple
 
-from Box2D import b2Body, b2Vec2, b2World
+from Box2D import b2Body, b2Vec2, b2World, b2PolygonShape
 
 from wheelly.sims import ObstacleMap
 from wheelly.utils import clip, lin_map, normalizeDeg, normalizeRad
@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 CONNECTION_TIMEOUT = 10.0
 READ_TIMEOUT = 3.0
+_OBSTACLE_SIZE = 0.2
 
 class RobotAPI:
     "API Interface for robot"
@@ -86,7 +87,7 @@ class RobotAPI:
 
     def sensor_obstacle(self) -> b2Vec2 | None:
         if self._distance > 0:
-            d = self._distance
+            d = self._distance + _OBSTACLE_SIZE / 2
             angle = radians(90 - self._robot_dir - self._sensor)
             return b2Vec2(d * cos(angle), d * sin(angle)) + self._robot_pos
         else:
@@ -261,7 +262,8 @@ ROBOT_WIDTH = 0.18
 ROBOT_LENGTH = 0.26
 _ROBOT_MASS = 0.78
 _ROBOT_DENSITY = _ROBOT_MASS / ROBOT_LENGTH / ROBOT_WIDTH
-_ROBOT_FRICTION = 0.3
+_ROBOT_FRICTION = 1
+_ROBOT_RESTITUTION = 0
 _MAX_DISTANCE = 3.0
 _SAFE_DISTANCE = 0.4
 
@@ -288,8 +290,17 @@ class SimRobot(RobotAPI):
         robot: b2Body = world.CreateDynamicBody(position=(0,0))
         box = robot.CreatePolygonFixture(box=(ROBOT_WIDTH / 2, ROBOT_LENGTH/ 2),
             density=_ROBOT_DENSITY,
-            friction=_ROBOT_FRICTION)
+            friction=_ROBOT_FRICTION,
+            restitution=_ROBOT_RESTITUTION)
         robot.angle = pi / 2
+
+        for i in range(0, obstacles.num_obstacles()):
+            pos = obstacles[i]
+            s = obstacles.size() / 2
+            world.CreateStaticBody(
+                position=(pos[0], pos[1]),
+                shapes=b2PolygonShape(box=(s,s)),
+        )
 
         self._obstacles = obstacles
         self._distance = 0
@@ -350,6 +361,7 @@ class SimRobot(RobotAPI):
         sensor_rad = radians(sensor_deg)
         _, dist = self._obstacles.nearest(location=np.array([robot_pos.x, robot_pos.y]),
             dir_rad=sensor_rad)
+        dist = clip(dist - self._obstacles.size() / 2, 0, 3)
         self._distance = dist if dist < _MAX_DISTANCE else 0.0
         self._can_move_forward = dist < _SAFE_DISTANCE
         return self
