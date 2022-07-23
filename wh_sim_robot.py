@@ -12,14 +12,17 @@ FPS = 60
 def _move(t:int, env:SimRobot, start:float, stop:float, dir:float, speed: float):
     if t >= start and t <= stop:
         env.move(dir, speed)
-    else:
+
+def _halt(t:int, env:SimRobot, start:float, stop:float):
+    if t >= start and t <= stop:
         env.halt()
 
 def _scan(t:int, env:SimRobot, start:float, stop:float, dir:int):
     if t >= start and t <= stop:
         env.scan(dir)
-    else:
-        env.scan(0)
+
+def halt(env:SimRobot, start:float, stop:float) -> Callable[[float], Any]:
+    return lambda t: _halt(t=t, env=env, start=start, stop=stop)
 
 def move(env:SimRobot, start:float, stop:float, dir:float, speed: float) -> Callable[[float], Any]:
     return lambda t: _move(t=t, env=env, start=start, stop=stop, dir=dir, speed=speed)
@@ -43,8 +46,11 @@ def main():
     robot = SimRobot(obs)
     window = RobotWindow().set_robot(robot).render()
     behavior = concat(
-        move(robot, 0, 4, 90, 1),
-        scan(robot, 1, 3, 90)
+        move(robot, 0, 10, 90, 1),
+        move(robot, 10, 15, 90, -1),
+        halt(robot, 15, 16),
+        scan(robot, 1, 9, 60),
+        scan(robot, 9, 10, 0)
     )
 
     robot.start()
