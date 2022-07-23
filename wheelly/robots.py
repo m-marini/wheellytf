@@ -12,7 +12,7 @@ import socket
 import time
 import numpy as np
 
-from math import degrees, pi, radians
+from math import cos, degrees, pi, radians, sin
 from typing import Any, Tuple
 
 from Box2D import b2Body, b2Vec2, b2World
@@ -32,6 +32,7 @@ class RobotAPI:
         self._robot_dir = 0
         self._sensor = 0
         self._time = 0.0
+        self._distance = 0.0
         self._status: dict[str, Any]= {}
 
     def start(self):
@@ -79,9 +80,17 @@ class RobotAPI:
     def sensor_dir(self) -> int:
         """Returns the sensor direction"""
         return self._sensor
-    
+
+    def sensor_distance(self) -> float:
+        return self._distance
+
     def sensor_obstacle(self) -> b2Vec2 | None:
-        return None
+        if self._distance > 0:
+            d = self._distance
+            angle = radians(90 - self._robot_dir - self._sensor)
+            return b2Vec2(d * cos(angle), d * sin(angle)) + self._robot_pos
+        else:
+            return None
 
     def time(self):
         """Returns the robot time"""
@@ -89,7 +98,11 @@ class RobotAPI:
 
     def status(self):
         """Returns the robot status"""
-        return self._status;
+        return self._status
+    
+    def obstaclesMap(self)-> ObstacleMap | None:
+        """Returns the obstacle map if any"""
+        return None
 
 
 class Robot(RobotAPI):
@@ -294,12 +307,6 @@ class SimRobot(RobotAPI):
     def start(self):
         return self
 
-    def robot_pos(self) -> b2Vec2:
-        return self.robot.position
-
-    def robot_dir(self):
-        return normalizeDeg(round(90 - degrees(self.robot.angle)))
-
     def move(self, dir: int, speed: float):
         self._direction = dir
         self._speed = speed
@@ -328,15 +335,21 @@ class SimRobot(RobotAPI):
             "canMoveForward": self._can_move_forward,
             "canMoveBackward": self._can_move_backward,
         }
+    
+    def obstaclesMap(self) -> ObstacleMap | None:
+        return self._obstacles
 
     def tick(self, dt:float):
         self._controller(dt)
         self.world.Step(dt, _VELOCITY_ITER, _POSITION_ITER)
         self._time += dt
+        self._robot_pos = self.robot.position
+        self._robot_dir = normalizeDeg(round(90 - degrees(self.robot.angle)))
         robot_pos = self._robot_pos
-        sensor_deg = normalizeDeg(90 - (self._robot_dir + self._sensor))
+        sensor_deg = normalizeDeg(90 - self._robot_dir - self._sensor)
         sensor_rad = radians(sensor_deg)
-        _, dist = self._obstacles.nearest(np.array([robot_pos.x, robot_pos.y]), sensor_rad)
+        _, dist = self._obstacles.nearest(location=np.array([robot_pos.x, robot_pos.y]),
+            dir_rad=sensor_rad)
         self._distance = dist if dist < _MAX_DISTANCE else 0.0
         self._can_move_forward = dist < _SAFE_DISTANCE
         return self

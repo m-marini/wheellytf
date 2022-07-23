@@ -37,8 +37,8 @@ def concat(*behaviors: Callable[[int], Any]) -> Callable[[int], Any]:
 def main():
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(name)s: %(message)s')
     obs = ObstacleMapBuilder(size=0.2) \
-        .rect((-10., -10.), (10., 10.)) \
-        .add((1,0)) \
+        .rect((-5., -5.), (5., 5.)) \
+        .add((1, 0)) \
         .build()
     robot = SimRobot(obs)
     window = RobotWindow().set_robot(robot).render()
@@ -49,18 +49,20 @@ def main():
 
     robot.start()
     running = True
-    true_clock = False
-    clock = pygame.time.Clock()
     t = 0
     dt = 0.01
+    tf = int(1000 / FPS)
+    next_frame = tf
+    sync_wait = 2
     while running:
-        clock.tick(FPS)
-        for _ in range(0, 100):
-            t += dt
-            behavior(t)
-            robot.tick(dt)
-
-        window.set_robot(robot).render()
+        t += dt
+        behavior(t)
+        robot.tick(dt)
+        if int(t * 1000) >= next_frame - sync_wait:
+            tt = pygame.time.get_ticks()
+            pygame.time.wait(next_frame - tt)
+            window.set_robot(robot).render()
+            next_frame += tf
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
