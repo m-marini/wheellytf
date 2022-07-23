@@ -52,6 +52,7 @@ class RobotWindow:
         self._robor_pos= np.zeros(2)
         self._robor_dir= 0
         self._sensor_dir = 0
+        self._contacts = 0
         self._font = pygame.font.SysFont(_FONT_NAME, _FONT_SIZE) 
         self._canvas = pygame.Surface((WINDOW_SIZE, WINDOW_SIZE))
         self._trans = _transMatrix()
@@ -75,6 +76,7 @@ class RobotWindow:
         self._distance = robot.sensor_distance()
         self._sensor_obstacle = robot.sensor_obstacle()
         self._obstaclesMap = robot.obstaclesMap()
+        self._contacts = robot.contacts()
         return self
 
     def render(self):
@@ -92,6 +94,7 @@ class RobotWindow:
 
     def _drawHud(self):
         self.drawText(text=f"sensor {self._distance:.1f} m", location=(0, 0), color=(0, 255, 0))
+        self.drawText(text=f"contacts {self._contacts} m", location=(0, _FONT_SIZE), color=(0, 255, 0))
         return self
 
     def drawText(self, text: str, location: Tuple[int, int], color: Tuple[int, int, int]):
