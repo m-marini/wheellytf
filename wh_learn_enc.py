@@ -6,11 +6,13 @@ from tensorforce import Environment
 from tensorforce.agents import Agent
 
 from wheelly.envs import EncodedRobotEnv, RobotEnv
-from wheelly.renders import WINDOW_SIZE, RobotWindow
+from wheelly.renders import RobotWindow
 from wheelly.robots import Robot, SimRobot
+from wheelly.sims import ObstacleMapBuilder
+from wheelly.objectives import stuck
 
-FONT_NAME = 'freesans'
-FONT_SIZE = 20
+_DEFAULT_DISCOUNT = 0.99
+_FPS = 60
 
 font:pygame.font.Font | None = None
 
@@ -35,37 +37,26 @@ def init_argparse() -> argparse.ArgumentParser:
     )
     return parser
 
-def render_info(window: pygame.Surface, string: str):
-    logging.debug(string)
-
-def render_info1(window: pygame.Surface, string: str):
-    text = font.render(string, True, (0, 0, 0))
-    #get the rect of the text
-    textRect = text.get_rect()
-    #set the position of the text
-    textRect.center = (WINDOW_SIZE / 2, 10)
-    #add text to window
-    window.blit(text, textRect)
-    pygame.display.update()
-
 def main():
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s %(name)s: %(message)s')
     logging.getLogger("wheelly.envs.robot").setLevel(logging.DEBUG)
 #    logging.info(pygame.font.get_fonts())
     parser = init_argparse()
     args = parser.parse_args()
-    pygame.init()
-    font = pygame.font.SysFont(FONT_NAME, FONT_SIZE) 
 
     logging.info("Loading environment ...")
 
-    robot = SimRobot()
+    robot = SimRobot(obstacles=ObstacleMapBuilder(size=0.2) \
+        .rect((-5, -5), (5, 5))
+        .add((2,2))
+        .build())
 #    robot = Robot(
 #        robotHost="192.168.1.11",
 #        robotPort=22
 #    )
     env1:RobotEnv = Environment.create(environment=args.environment,
-        robot=robot)
+        robot=robot,
+        reward=stuck())
 
     environment:EncodedRobotEnv = Environment.create(
         environment=EncodedRobotEnv,
@@ -85,17 +76,19 @@ def main():
     logging.info("Running ...")
     running = True
     avg_rewards = 0.0
-    discount = 0.99
+    discount = _DEFAULT_DISCOUNT
+    frame_inter = int(1000 / _FPS)
+    time_frame = pygame.time.get_ticks()
     while running:
         actions = agent.act(states=states)
         states, terminal, reward = environment.execute(actions=actions)
         avg_rewards = avg_rewards * discount + reward * (1 - discount)
         agent.observe(terminal=terminal, reward=reward)
+        t = pygame.time.get_ticks()
+        if t > time_frame:
+            window.set_robot(robot).set_reward(avg_rewards).render()
+            time_frame += frame_inter
 
-        window.set_robot(robot).render()
-        render_info(window=window, string=f"Average {avg_rewards:.2f}")
-
-         #   render_info(env1.window, f"Average reward {tot_rew / no_step}")
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -106,18 +99,6 @@ def main():
     logging.info("Closing environment ...")
     environment.close()
     logging.info("Completed.")
-
-def dummy():
-    agent:Agent = Agent.load(directory=args.model,
-        environment=environment,
-        summarizer=dict(
-            directory='tensorboard',
-            # list of labels, or 'all'
-            labels=['entropy', 'kl-divergence', 'loss', 'reward', 'update-norm']
-            #labels=['all']
-        )
-    )
-
 
 if __name__ == '__main__':
     main()

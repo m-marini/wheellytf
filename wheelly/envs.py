@@ -1,5 +1,5 @@
 import logging
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 from tensorforce import Environment
@@ -8,13 +8,13 @@ from wheelly.encoders import (ClipEncoder, DictEncoder, FeaturesEncoder,
                               GetEncoder, MergeEncoder, ScaleEncoder,
                               SupplyEncoder, TilesEncoder, createSpace)
 from wheelly.robots import RobotAPI
+from wheelly.objectives import no_move
 
 _logger = logging.getLogger(__name__)
 
 _REACTION_INTERVAL = 0.3
 _COMMAND_INTERVAL = 0.9
 _DEFAULT_INTERVAL = 0.01
-_VELOCITY_THRESHOLD = 0.01
 
 MIN_SENSOR_DIR = -90
 MAX_SENSOR_DIR = 90
@@ -144,13 +144,15 @@ class MockRobotEnv(Environment):
 class RobotEnv(Environment):
     """Base robot environment"""
     def __init__(self, robot: RobotAPI,
-        interval = _DEFAULT_INTERVAL,
-        reactionInterval = _REACTION_INTERVAL,
-        commandInterval = _COMMAND_INTERVAL):
+        reward=no_move(),
+        interval=_DEFAULT_INTERVAL,
+        reactionInterval=_REACTION_INTERVAL,
+        commandInterval=_COMMAND_INTERVAL):
         """Creates a Robot envinment
         
         Argument:
         robot -- the robot api interface
+        reward -- the reward function
         interval -- the interval between robot api ticks
         reactionInterval -- the (action/state) reaction interval (sec)
         commandInterval -- the interval between commands (sec)
@@ -160,6 +162,7 @@ class RobotEnv(Environment):
         self._reaction_interval = reactionInterval
         self._command_interval = commandInterval
         self._interval = interval
+        self._reward = reward
         
         self._started = False
         
@@ -212,20 +215,6 @@ class RobotEnv(Environment):
         if self._robot != None:
             self._robot.close()
 
-    def _reward(self, status: dict[str, Any]) -> float:
-        """Reward function"""
-        if self._can_move_forward[0] == 0 or status["canMoveBackward"] == 0:
-            return -1
-        elif abs(status["left"]) < _VELOCITY_THRESHOLD and abs(status["right"]) < _VELOCITY_THRESHOLD and self._sensor == 0:
-            return 1
-        else:
-            return 0
-        """
-        return -1 if self._can_move_forward[0] == 0 \
-            or status["canMoveBackward"] == 0 else \
-            1 if status["left"] == 0 and status["right"] == 0 and self._sensor == 0 else \
-            0
-"""
     def _readStatus(self, time: float):
         """Reads the status of robot afetr a time interval
         
