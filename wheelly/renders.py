@@ -1,7 +1,8 @@
 import math
 from typing import Iterable, Tuple
-import pygame
+
 import numpy as np
+import pygame
 from numpy import ndarray
 
 from wheelly.robots import RobotAPI
@@ -26,6 +27,7 @@ ROBOT_SHAPE = np.array([
 
 OBSTACLE_SIZE = 0.2
 OBSTACLE_COLOR = (255, 0, 0)
+OBSTACLE_PHANTOM_COLOR = (128, 128, 128)
 OBSTACLE_SHAPE = np.array([
     (OBSTACLE_SIZE / 2, OBSTACLE_SIZE / 2),
     (-OBSTACLE_SIZE / 2, OBSTACLE_SIZE / 2),
@@ -33,7 +35,10 @@ OBSTACLE_SHAPE = np.array([
     (OBSTACLE_SIZE / 2, -OBSTACLE_SIZE / 2),
 ])
 
-SENSOR_COLOR = (255, 0, 0)
+GREEN = (0, 255, 0)
+RED = (255, 0, 0)
+
+SENSOR_COLOR = (128, 0, 0)
 SENSOR_LENGTH = 3.0
 SENSOR_SHAPE = np.array([
     (0.0, 0.0),
@@ -42,6 +47,10 @@ SENSOR_SHAPE = np.array([
 
 _FONT_NAME = 'freesans'
 _FONT_SIZE = 16
+
+_HUD_WIDTH = 200
+_HUD_HEIGHT = _FONT_SIZE * 6 + 2
+_HUD_BACKGROUND = (32, 32, 32)
 
 class RobotWindow:
 
@@ -53,6 +62,9 @@ class RobotWindow:
         self._robor_dir= 0
         self._sensor_dir = 0
         self._contacts = 0
+        self._can_move_forward = True
+        self._can_move_backward = True
+        self._reward = 0.0
         self._font = pygame.font.SysFont(_FONT_NAME, _FONT_SIZE) 
         self._canvas = pygame.Surface((WINDOW_SIZE, WINDOW_SIZE))
         self._trans = _transMatrix()
@@ -68,6 +80,10 @@ class RobotWindow:
     def sensor_dir(self, sensor_dir:int):
         self._sensor_dir = sensor_dir
         return self
+    
+    def set_reward(self, reward: float):
+        self._reward = reward
+        return self
 
     def set_robot(self, robot: RobotAPI):
         self._robot_pos = robot.robot_pos()
@@ -77,6 +93,9 @@ class RobotWindow:
         self._sensor_obstacle = robot.sensor_obstacle()
         self._obstaclesMap = robot.obstaclesMap()
         self._contacts = robot.contacts()
+        self._can_move_forward = robot.can_move_forward()
+        self._can_move_backward = robot.can_move_backward()
+        self._time = robot.time()
         return self
 
     def render(self):
@@ -93,16 +112,26 @@ class RobotWindow:
         return self
 
     def _drawHud(self):
-        self.drawText(text=f"sensor {self._distance:.1f} m", location=(0, 0), color=(0, 255, 0))
-        self.drawText(text=f"contacts {self._contacts} m", location=(0, _FONT_SIZE), color=(0, 255, 0))
+        canvas = pygame.Surface((_HUD_WIDTH, _HUD_HEIGHT))
+        canvas.fill(_HUD_BACKGROUND)
+        self.drawText(text=f"Distance {self._distance:.2f} m", location=(0, 0), color=GREEN, canvas=canvas)
+        self.drawText(text=f"Contacts {self._contacts}", location=(0, _FONT_SIZE), color=GREEN, canvas=canvas)
+        if not self._can_move_forward:
+            self.drawText(text=f"FORWARD STOP", location=(0, _FONT_SIZE * 2), color=RED, canvas=canvas)
+        if not self._can_move_backward:
+            self.drawText(text=f"BACKWARD STOP", location=(0, _FONT_SIZE * 3), color=RED, canvas=canvas)
+        self.drawText(text=f"Time   {self._time:.1f}", location=(0, _FONT_SIZE * 4), color=GREEN, canvas=canvas)
+        self.drawText(text=f"Reward {self._reward:.2f}", location=(0, _FONT_SIZE * 5), color=GREEN, canvas=canvas)
+        self._canvas.blit(canvas, canvas.get_rect())
         return self
 
-    def drawText(self, text: str, location: Tuple[int, int], color: Tuple[int, int, int]):
+    def drawText(self, text: str, location: Tuple[int, int], color: Tuple[int, int, int], canvas: pygame.Surface = None):
         """Draw a text"""
         graphTxt = self._font.render(text, True, color)
         textRect = graphTxt.get_rect()
         textRect.topleft = location
-        self._canvas.blit(graphTxt, textRect)
+        canvas = canvas if canvas else self._canvas
+        canvas.blit(graphTxt, textRect)
         return self
 
     def _drawRobot(self):
@@ -119,9 +148,10 @@ class RobotWindow:
         """Draw the obstacle shape"""
         trans = translate(location) @ self._trans
         shape = transform(trans, OBSTACLE_SHAPE)
+        color = OBSTACLE_PHANTOM_COLOR if phantom else OBSTACLE_COLOR
         pygame.draw.polygon(
             surface=self._canvas,
-            color=OBSTACLE_COLOR,
+            color=color,
             width=1 if phantom else 0,
             points=shape)
         return self

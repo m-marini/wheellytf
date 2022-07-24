@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Issue #15: Simulate obstacles
 - Issue #18: Simulate obstacle collision
 - Issue #19: Simulate obstacle contact sensors
+- Issue #21: Simulate can move sensors
 
 ## [0.1.0] 2022-07-10
 

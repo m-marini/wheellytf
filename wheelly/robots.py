@@ -6,16 +6,19 @@ SimRobot() -- Simulated robot
 """
 from __future__ import annotations
 
+import random
 import logging
 import re
 import socket
 import time
-import numpy as np
 
 from math import cos, degrees, pi, radians, sin
+from os import stat
 from typing import Any, Tuple
 
-from Box2D import b2Body, b2Vec2, b2World, b2PolygonShape, b2EdgeShape, b2FixtureDef, b2Contact, b2ContactListener
+import numpy as np
+from Box2D import (b2Body, b2Contact, b2ContactListener, b2PolygonShape,
+                   b2Vec2, b2World)
 
 from wheelly.sims import ObstacleMap
 from wheelly.utils import clip, lin_map, normalizeDeg, normalizeRad
@@ -35,6 +38,8 @@ class RobotAPI:
         self._time = 0.0
         self._distance = 0.0
         self._contacts = 0
+        self._can_move_forward = True
+        self._can_move_backward = True
         self._status: dict[str, Any]= {}
 
     def start(self):
@@ -84,12 +89,23 @@ class RobotAPI:
         return self._sensor
 
     def sensor_distance(self) -> float:
+        """Returns the sensor distance"""
         return self._distance
     
     def contacts(self):
+        """Returns the contact sensors"""
         return self._contacts
 
+    def can_move_forward(self):
+        """Returns the move forward sensors"""
+        return self._can_move_forward
+
+    def can_move_backward(self):
+        """Returns the move backward sensors"""
+        return self._can_move_backward
+
     def sensor_obstacle(self) -> b2Vec2 | None:
+        """Returns the obstacle location"""
         if self._distance > 0:
             d = self._distance + _OBSTACLE_SIZE / 2
             angle = radians(90 - self._robot_dir - self._sensor)
@@ -162,6 +178,8 @@ class Robot(RobotAPI):
                     self._time = status['timestamp']
                     self._contacts = status['contacts']
                     self._distance = status['dist']
+                    self._can_move_forward = status['canMoveForward'] == 1
+                    self._can_move_backward = status['canMoveBackward'] == 1
                 else:
                     self._time = time.time()
         return self
@@ -271,7 +289,7 @@ _ROBOT_DENSITY = _ROBOT_MASS / ROBOT_LENGTH / ROBOT_WIDTH
 _ROBOT_FRICTION = 1
 _ROBOT_RESTITUTION = 0
 _MAX_DISTANCE = 3.0
-_SAFE_DISTANCE = 0.4
+_SAFE_DISTANCE = 0.2
 
 _ROBOT_TRACK = 0.136
 _MAX_ACC = 1
@@ -287,6 +305,7 @@ _RAD_10 = radians(10)
 _RAD_30 = radians(30)
 
 _SENSOR_GAP = 0.01
+_ERR_SIGMA = 0.1 / 2
 
 _FRONT_LEFT = [
     (_SENSOR_GAP, ROBOT_WIDTH / 2 + _SENSOR_GAP),
@@ -309,16 +328,10 @@ _REAR_RIGHT = [
     (-ROBOT_LENGTH / 2 - _SENSOR_GAP, -_SENSOR_GAP)
 ]
 
-class MyListener(b2ContactListener):
-    def __init__(self):
-        b2ContactListener.__init__(self)
-
-
-
 class SimRobot(RobotAPI, b2ContactListener):
     """Simulated robot"""
 
-    def __init__(self, obstacles: ObstacleMap):
+    def __init__(self, obstacles: ObstacleMap, err_sigma=_ERR_SIGMA):
         """Create a Rsimulated robot envinment"""
         RobotAPI.__init__(self)
         b2ContactListener.__init__(self)
@@ -356,19 +369,20 @@ class SimRobot(RobotAPI, b2ContactListener):
 
         self._obstacles = obstacles
         self._speed = 0.0
-        self._can_move_forward = 1
-        self._can_move_backward = 1
         self._left = 0
         self._right = 0
+        self._direction = 0
+        self._err_sigma = err_sigma
         self.world = world
         self.robot = robot
-
+        
     def start(self):
         return self
 
     def move(self, dir: int, speed: float):
         self._direction = dir
         self._speed = speed
+        self._checkForSpeed()
         return self
 
     def scan(self, dir: int):
@@ -391,8 +405,8 @@ class SimRobot(RobotAPI, b2ContactListener):
             "left": self._left,
             "right": self._right,
             "contacts": self._contacts,
-            "canMoveForward": self._can_move_forward,
-            "canMoveBackward": self._can_move_backward,
+            "canMoveForward": 1 if self._can_move_forward else 0,
+            "canMoveBackward": 1 if self._can_move_backward else 0
         }
     
     def obstaclesMap(self) -> ObstacleMap | None:
@@ -411,11 +425,19 @@ class SimRobot(RobotAPI, b2ContactListener):
             dir_rad=sensor_rad)
         dist = clip(dist - self._obstacles.size() / 2, 0, 3)
         self._distance = dist if dist < _MAX_DISTANCE else 0.0
-        self._can_move_forward = dist < _SAFE_DISTANCE
+        self._can_move_forward = dist > _SAFE_DISTANCE and (self._contacts & 0xc) == 0
+        self._can_move_backward = (self._contacts & 0x3) == 0
+        self._checkForSpeed()
         return self
 
     def close(self) -> RobotAPI:
         return self
+
+    def _checkForSpeed(self):
+        if (self._speed > 0 and self._left > 0 and self._right > 0 and not self._can_move_forward) \
+            or (self._speed < 0 and self._left < 0 and self._right < 0 and not self._can_move_backward):
+            self.halt()
+        return self        
 
     def _controller(self, dt:float):
         robot = self.robot
@@ -436,6 +458,7 @@ class SimRobot(RobotAPI, b2ContactListener):
         dq = dv * robot.mass
         force = dq / dt
         local_force = robot.GetLocalVector(force)
+        local_force *= 1 + random.gauss(0, self._err_sigma)
         if local_force.x > _MAX_FORCE:
             local_force.x = _MAX_FORCE
             force = robot.GetWorldVector(local_force)
@@ -444,6 +467,7 @@ class SimRobot(RobotAPI, b2ContactListener):
             force = robot.GetWorldVector(local_force)
 
         angular_impulse = (angular_velocity - robot.angularVelocity) * robot.inertia
+        angular_impulse *= 1 + random.gauss(0, self._err_sigma)
 
         self.world.ClearForces()
         self.robot.ApplyForceToCenter(force=force, wake=True)
@@ -469,9 +493,3 @@ class SimRobot(RobotAPI, b2ContactListener):
     def EndContact(self, contact):
         value = self._contactValue(contact=contact)
         self._contacts &= ~value
-
-def _createSensor(robot:b2Body, vertices:list[tuple[float, float]], userData: Any):
-    return robot.CreateChainFixture(vertices=vertices,
-        isSensor=True,
-        userData=userData
-        )
