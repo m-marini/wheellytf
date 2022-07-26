@@ -27,4 +27,4 @@ def _stuck(status:dict[str, Any], distance:float=0.5, range:float=0.1)->float:
     elif abs(d - distance) <= range:
         return 1
     else:
-        return 0
+        return -0.1

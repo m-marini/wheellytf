@@ -28,13 +28,13 @@ def _concat(t: float, *behaviors: Callable[[float], None]):
         b(t)
 
 def _fmove(t:int, env:RobotAPI, start:float, stop:float, dir:Callable[[float], int], speed: Callable[[float], float]):
-    if t >= start and t <= stop:
-        env.move(dir(t-start), speed(t-start))
+    if t >= start and t < stop:
+        env.move(dir(t - start), speed(t - start))
 
 def _halt(t:int, env:RobotAPI, start:float, stop:float):
-    if t >= start and t <= stop:
+    if t >= start and t < stop:
         env.halt()
 
 def _fscan(t:int, env:RobotAPI, start:float, stop:float, dir:Callable[[float], int]):
-    if t >= start and t <= stop:
+    if t >= start and t < stop:
         env.scan(dir(t - start))

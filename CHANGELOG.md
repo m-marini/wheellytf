@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Fixed
 
 - Issue #13: Standard reference system
+- Issue #26: Simulation movement bug
 
 ### Added
 
