@@ -6,6 +6,7 @@ import pygame
 from numpy import ndarray
 
 from wheelly.robots import RobotAPI
+from wheelly.utils import str_time_inter
 
 WINDOW_SIZE = 800
 GRID_SIZE = 0.2
@@ -120,7 +121,7 @@ class RobotWindow:
             self.drawText(text=f"FORWARD STOP", location=(0, _FONT_SIZE * 2), color=RED, canvas=canvas)
         if not self._can_move_backward:
             self.drawText(text=f"BACKWARD STOP", location=(0, _FONT_SIZE * 3), color=RED, canvas=canvas)
-        self.drawText(text=f"Time   {self._time:.1f}", location=(0, _FONT_SIZE * 4), color=GREEN, canvas=canvas)
+        self.drawText(text=f"Time   {str_time_inter(self._time)}", location=(0, _FONT_SIZE * 4), color=GREEN, canvas=canvas)
         self.drawText(text=f"Reward {self._reward:.2f}", location=(0, _FONT_SIZE * 5), color=GREEN, canvas=canvas)
         self._canvas.blit(canvas, canvas.get_rect())
         return self

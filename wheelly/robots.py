@@ -32,17 +32,9 @@ _OBSTACLE_SIZE = 0.2
 class RobotAPI:
     "API Interface for robot"
     def __init__(self):
-        self._robot_pos = b2Vec2()
-        self._robot_dir = 0
-        self._sensor = 0
-        self._time = 0.0
-        self._distance = 0.0
-        self._contacts = 0
-        self._can_move_forward = True
-        self._can_move_backward = True
-        self._status: dict[str, Any]= {}
+        pass
 
-    def start(self):
+    def start(self) -> RobotAPI:
         "Start the robot interface"
         raise NotImplemented()
 
@@ -78,55 +70,56 @@ class RobotAPI:
 
     def robot_pos(self) -> b2Vec2:
         """Returns the robot position"""
-        return self._robot_pos
+        raise NotImplemented()
 
     def robot_dir(self) -> int:
         """Returns the robot direction"""
-        return self._robot_dir
+        raise NotImplemented()
 
     def sensor_dir(self) -> int:
         """Returns the sensor direction"""
-        return self._sensor
+        raise NotImplemented()
 
     def sensor_distance(self) -> float:
         """Returns the sensor distance"""
-        return self._distance
+        raise NotImplemented()
     
-    def contacts(self):
+    def contacts(self) -> int:
         """Returns the contact sensors"""
-        return self._contacts
+        raise NotImplemented()
 
-    def can_move_forward(self):
+    def can_move_forward(self) -> bool:
         """Returns the move forward sensors"""
-        return self._can_move_forward
+        raise NotImplemented()
 
-    def can_move_backward(self):
+    def can_move_backward(self) -> bool:
         """Returns the move backward sensors"""
-        return self._can_move_backward
+        raise NotImplemented()
 
     def sensor_obstacle(self) -> b2Vec2 | None:
         """Returns the obstacle location"""
-        if self._distance > 0:
-            d = self._distance + _OBSTACLE_SIZE / 2
-            angle = radians(90 - self._robot_dir - self._sensor)
-            return b2Vec2(d * cos(angle), d * sin(angle)) + self._robot_pos
+        dist = self.sensor_distance()
+        if dist > 0:
+            d = dist + _OBSTACLE_SIZE / 2
+            angle = radians(90 - self.robot_dir() - self.sensor_dir())
+            return b2Vec2(d * cos(angle), d * sin(angle)) + self.robot_pos()
         else:
             return None
 
-    def time(self):
+    def time(self) -> float:
         """Returns the robot time"""
-        return self._time
+        raise NotImplemented()
 
-    def status(self):
+    def status(self) -> dict[str, Any]:
         """Returns the robot status"""
-        return self._status
+        raise NotImplemented()
     
     def obstaclesMap(self)-> ObstacleMap | None:
         """Returns the obstacle map if any"""
         return None
 
-
 class Robot(RobotAPI):
+    """Implements the interface to the real robot"""
     def __init__(self,
         robotHost:str ,
         robotPort: int,
@@ -172,17 +165,34 @@ class Robot(RobotAPI):
                 status = _parse_status(data) if data else None
                 self._status = status
                 if status:
-                    self._robot_dir = status['dir']
-                    self._robot_pos = b2Vec2(status['x'], status['y'])
-                    self._sensor = status['sensor']
                     self._time = status['timestamp']
-                    self._contacts = status['contacts']
-                    self._distance = status['dist']
-                    self._can_move_forward = status['canMoveForward'] == 1
-                    self._can_move_backward = status['canMoveBackward'] == 1
                 else:
                     self._time = time.time()
         return self
+    
+    def robot_dir(self) -> int:
+        return self._status['dir'] if self._status else 0
+    
+    def robot_pos(self) -> b2Vec2:
+        return b2Vec2(self._status['x'], self._status['y']) if self._status else b2Vec2()
+
+    def sensor_dir(self) -> int:
+        return self._status['sensor'] if self._status else 0
+
+    def sensor_distance(self) -> float:
+        return self._status['dist'] if self._status else 0.0
+
+    def contacts(self):
+        return self._status['contacts'] if self._status else 0
+    
+    def can_move_forward(self):
+        return self._status['canMoveForward'] == 1 if self._status else False
+
+    def can_move_forward(self):
+        return self._status['canMoveBackward'] == 1 if self._status else False
+    
+    def time(self):
+        return self._time
 
     def close(self):
         if self._socket:
@@ -299,13 +309,12 @@ _MAX_VELOCITY = 0.280
 _VELOCITY_ITER = 10
 _POSITION_ITER = 10
 
-_TRACK = 0.136
-
 _RAD_10 = radians(10)
 _RAD_30 = radians(30)
 
 _SENSOR_GAP = 0.01
-_ERR_SIGMA = 0.1 / 2
+_ERR_SIGMA = 0.05
+_ERR_SENSOR = 0.02
 
 _FRONT_LEFT = [
     (_SENSOR_GAP, ROBOT_WIDTH / 2 + _SENSOR_GAP),
@@ -331,7 +340,7 @@ _REAR_RIGHT = [
 class SimRobot(RobotAPI, b2ContactListener):
     """Simulated robot"""
 
-    def __init__(self, obstacles: ObstacleMap, err_sigma=_ERR_SIGMA):
+    def __init__(self, obstacles: ObstacleMap, err_sigma=_ERR_SIGMA, err_sensor=_ERR_SENSOR):
         """Create a Rsimulated robot envinment"""
         RobotAPI.__init__(self)
         b2ContactListener.__init__(self)
@@ -368,14 +377,44 @@ class SimRobot(RobotAPI, b2ContactListener):
         )
 
         self._obstacles = obstacles
-        self._speed = 0.0
-        self._left = 0
-        self._right = 0
-        self._direction = 0
+        self._speed = 0.0 # requiered speed
+        self._left = 0 # real left motor speed
+        self._right = 0 # real right motor speed
+        self._direction = 0 #r equired directin
+        self._sensor = 0 # sensor direction
+        self._distance = 0.0 # sensor measured distance
+        self._contacts = 0 # contact sensors value
+        self._can_move_forward = True # move forward sensor
+        self._can_move_backward = True # move backward sensor
+        self._time = 0.0 # robot time
         self._err_sigma = err_sigma
         self.world = world
         self.robot = robot
+    
+    def robot_pos(self) -> b2Vec2:
+        return self.robot.position
         
+    def robot_dir(self) -> int:
+        return normalizeDeg(round(90 - degrees(self.robot.angle)))
+    
+    def sensor_dir(self) -> int:
+        return self._sensor
+    
+    def sensor_distance(self) -> float:
+        return self._distance
+
+    def contacts(self):
+        return self._contacts
+
+    def can_move_forward(self):
+        return self._can_move_forward
+
+    def can_move_backward(self):
+        return self._can_move_backward
+
+    def time(self):
+        return self._time
+
     def start(self):
         return self
 
@@ -398,7 +437,7 @@ class SimRobot(RobotAPI, b2ContactListener):
         return {
             "timestamp": self._time,
             "x": self.robot_pos().x,
-            "y": self.robot_pos().x,
+            "y": self.robot_pos().y,
             "dir": self.robot_dir(),
             "sensor": self._sensor,
             "dist": self._distance,
@@ -416,15 +455,13 @@ class SimRobot(RobotAPI, b2ContactListener):
         self._controller(dt)
         self.world.Step(dt, _VELOCITY_ITER, _POSITION_ITER)
         self._time += dt
-        self._robot_pos = self.robot.position
-        self._robot_dir = normalizeDeg(round(90 - degrees(self.robot.angle)))
-        robot_pos = self._robot_pos
-        sensor_deg = normalizeDeg(90 - self._robot_dir - self._sensor)
+        robot_pos = self.robot_pos()
+        sensor_deg = normalizeDeg(90 - self.robot_dir() - self._sensor)
         sensor_rad = radians(sensor_deg)
         _, dist = self._obstacles.nearest(location=np.array([robot_pos.x, robot_pos.y]),
             dir_rad=sensor_rad)
         dist = clip(dist - self._obstacles.size() / 2, 0, 3)
-        self._distance = dist if dist < _MAX_DISTANCE else 0.0
+        self._distance = clip(dist + random.gauss(0, self._err_sigma), 0, _MAX_DISTANCE) if dist < _MAX_DISTANCE else 0.0
         self._can_move_forward = dist > _SAFE_DISTANCE and (self._contacts & 0xc) == 0
         self._can_move_backward = (self._contacts & 0x3) == 0
         self._checkForSpeed()
@@ -441,6 +478,7 @@ class SimRobot(RobotAPI, b2ContactListener):
 
     def _controller(self, dt:float):
         robot = self.robot
+
         delta_angle = normalizeRad(radians(90 - self._direction) - robot.angle)
         angular_velocity = clip(lin_map(delta_angle, -_RAD_10, _RAD_10, -1, 1), -1, 1)
         linear_velocity = self._speed * clip(lin_map(abs(delta_angle), 0, _RAD_30, 1, 0), 0, 1)
@@ -452,7 +490,7 @@ class SimRobot(RobotAPI, b2ContactListener):
         self._right = right * _MAX_VELOCITY
 
         forward_velocity = (left + right) / 2 * _MAX_VELOCITY
-        angular_velocity = (right - left) * _MAX_VELOCITY / _TRACK
+        angular_velocity = (right - left) * _MAX_VELOCITY / _ROBOT_TRACK
         target_velocity = robot.GetWorldVector((forward_velocity, 0))
         dv = target_velocity - robot.linearVelocity
         dq = dv * robot.mass
