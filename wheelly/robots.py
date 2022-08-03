@@ -68,6 +68,10 @@ class RobotAPI:
         """Closes the API interface"""
         raise NotImplemented()
 
+    def reset(self) -> RobotAPI:
+        """Closes the API interface"""
+        raise NotImplemented()
+
     def robot_pos(self) -> b2Vec2:
         """Returns the robot position"""
         raise NotImplemented()
@@ -110,6 +114,10 @@ class RobotAPI:
         """Returns the robot time"""
         raise NotImplemented()
 
+    def elapsed(self) -> float:
+        """Returns the time since last reset"""
+        raise NotImplemented()
+
     def status(self) -> dict[str, Any]:
         """Returns the robot status"""
         raise NotImplemented()
@@ -141,6 +149,7 @@ class Robot(RobotAPI):
         self._socket = None
         self._timestamp_offset = None
         self._time = time.time()
+        self._reset_time = self._time
         self._status = None
 
     def start(self):
@@ -154,6 +163,11 @@ class Robot(RobotAPI):
 
     def halt(self):
         return self._write_cmd("al")
+    
+    def reset(self):
+        self._reset_time = self._time
+        self._status = None
+        return self
 
     def tick(self, dt: float):
         if self._socket:
@@ -193,6 +207,9 @@ class Robot(RobotAPI):
     
     def time(self):
         return self._time
+
+    def elapsed(self):
+        return self._time - self._reset_time
 
     def close(self):
         if self._socket:
@@ -294,11 +311,11 @@ def _parse_status(timed_line:tuple[str, float]):
 
 ROBOT_WIDTH = 0.18
 ROBOT_LENGTH = 0.26
+MAX_DISTANCE = 3.0
 _ROBOT_MASS = 0.78
 _ROBOT_DENSITY = _ROBOT_MASS / ROBOT_LENGTH / ROBOT_WIDTH
 _ROBOT_FRICTION = 1
 _ROBOT_RESTITUTION = 0
-_MAX_DISTANCE = 3.0
 _SAFE_DISTANCE = 0.2
 
 _ROBOT_TRACK = 0.136
@@ -313,8 +330,6 @@ _RAD_10 = radians(10)
 _RAD_30 = radians(30)
 
 _SENSOR_GAP = 0.01
-_ERR_SIGMA = 0.05
-_ERR_SENSOR = 0.02
 
 _FRONT_LEFT = [
     (_SENSOR_GAP, ROBOT_WIDTH / 2 + _SENSOR_GAP),
@@ -339,9 +354,9 @@ _REAR_RIGHT = [
 
 class SimRobot(RobotAPI, b2ContactListener):
     """Simulated robot"""
-
-    def __init__(self, obstacles: ObstacleMap, err_sigma=_ERR_SIGMA, err_sensor=_ERR_SENSOR):
-        """Create a Rsimulated robot envinment"""
+    
+    def __init__(self, obstacles: ObstacleMap, err_sigma=0.05, err_sensor=0.05):
+        """Create a simulated robot envinment"""
         RobotAPI.__init__(self)
         b2ContactListener.__init__(self)
 
@@ -377,7 +392,7 @@ class SimRobot(RobotAPI, b2ContactListener):
         )
 
         self._obstacles = obstacles
-        self._speed = 0.0 # requiered speed
+        self._speed = 0.0 # required speed
         self._left = 0 # real left motor speed
         self._right = 0 # real right motor speed
         self._direction = 0 #r equired directin
@@ -387,7 +402,9 @@ class SimRobot(RobotAPI, b2ContactListener):
         self._can_move_forward = True # move forward sensor
         self._can_move_backward = True # move backward sensor
         self._time = 0.0 # robot time
+        self._reset_time = 0.0
         self._err_sigma = err_sigma
+        self._err_sensor = err_sensor
         self.world = world
         self.robot = robot
     
@@ -414,6 +431,26 @@ class SimRobot(RobotAPI, b2ContactListener):
 
     def time(self):
         return self._time
+
+    def elapsed(self):
+        return self._time - self._reset_time
+
+    def reset(self):
+        self._speed = 0.0 # required speed
+        self._left = 0 # real left motor speed
+        self._right = 0 # real right motor speed
+        self._direction = 0 #r equired directin
+        self._sensor = 0 # sensor direction
+        self._distance = 0.0 # sensor measured distance
+        self._contacts = 0 # contact sensors value
+        self._can_move_forward = True # move forward sensor
+        self._can_move_backward = True # move backward sensor
+        self._reset_time = self._time
+        self.robot.position = (0,0)
+        self.robot.linearVelocity = (0,0)
+        self.robot.angle = pi / 2
+        self.robot.angularVelocity = 0
+        return self
 
     def start(self):
         return self
@@ -461,13 +498,13 @@ class SimRobot(RobotAPI, b2ContactListener):
         _, dist = self._obstacles.nearest(location=np.array([robot_pos.x, robot_pos.y]),
             dir_rad=sensor_rad)
         dist = clip(dist - self._obstacles.size() / 2, 0, 3)
-        self._distance = clip(dist + random.gauss(0, self._err_sigma), 0, _MAX_DISTANCE) if dist < _MAX_DISTANCE else 0.0
+        self._distance = clip(dist + random.gauss(0, self._err_sensor), 0, MAX_DISTANCE) if dist < MAX_DISTANCE else 0.0
         self._can_move_forward = dist > _SAFE_DISTANCE and (self._contacts & 0xc) == 0
         self._can_move_backward = (self._contacts & 0x3) == 0
         self._checkForSpeed()
         return self
 
-    def close(self) -> RobotAPI:
+    def close(self):
         return self
 
     def _checkForSpeed(self):

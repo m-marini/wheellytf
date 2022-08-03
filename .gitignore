@@ -3,3 +3,4 @@
 /saved-model/*
 /tensorboard/*
 /saved-model-no-move/*
+*.csv

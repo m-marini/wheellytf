@@ -173,6 +173,16 @@ class ClipEncoder(Encoder):
         x = self._encoder.encode()
         return np.clip(x, self._space.low, self._space.high)
 
+class Binary2BoxEncoder(Encoder):
+    def __init__(self, encoder: Encoder):
+        self._encoder = encoder
+        space = encoder.space()
+        assert isinstance(space, MultiBinary)
+        super().__init__(Box(shape=(space.n,), low=0, high=1))
+
+    def encode(self) -> np.ndarray:
+        return self._encoder.encode()
+
 class ScaleEncoder(Encoder):
     def __init__(self, encoder: Encoder, low: np.ndarray, high: np.ndarray):
         space = encoder.space()
@@ -277,7 +287,6 @@ def offsets(k: int):
     z = np.mod(np.broadcast_to(disp, (n, k)) * np.arange(n).reshape((n, 1)), n)
     return z
 
-
 def tile(x: np.ndarray, offsets: np.ndarray):
     """ Returns the coordinates of tile (np array (n, k))
 
@@ -290,7 +299,6 @@ def tile(x: np.ndarray, offsets: np.ndarray):
     n, _ = offsets.shape
     y = np.floor(offsets / n + x).astype(int)
     return y
-
 
 def features(x: np.ndarray, sizes: np.ndarray) -> np.ndarray:
     """ Returns the features tiles (np array, (1))

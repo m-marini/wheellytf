@@ -1,4 +1,5 @@
 {
     "environment": "wheelly.envs.RobotEnv",
-    "interval": 50e-3
+    "interval": 50e-3,
+    "max_episode_time": 900
 }

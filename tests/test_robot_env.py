@@ -21,8 +21,10 @@ def test_space():
     )
     s = wrapper.states()
     assert s == {
-        "type": "bool",
-        "shape": NO_FEATURES
+        "type": "float",
+        "shape": (NO_FEATURES,),
+        "min_value": 0.,
+        "max_value": 1.,
     }
 
 def test_reset():
