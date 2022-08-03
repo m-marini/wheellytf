@@ -1,20 +1,48 @@
 import argparse
+from datetime import datetime
 import logging
+from random import Random
+from typing import Tuple
+from numpy import ndarray, zeros
 
 import pygame
 from tensorforce import Environment
 from tensorforce.agents import Agent
 
 from wheelly.envs import EncodedRobotEnv, RobotEnv
+from wheelly.objectives import fuzzy_stuck
 from wheelly.renders import RobotWindow
 from wheelly.robots import Robot, SimRobot
 from wheelly.sims import ObstacleMapBuilder
-from wheelly.objectives import stuck
 
 _DEFAULT_DISCOUNT = 0.99
 _FPS = 60
 
 font:pygame.font.Font | None = None
+
+class StatsFile:
+    def __init__(self, prefix:str):
+        self._filename = f"{prefix}-{datetime.now().strftime('%Y%m%d-%H%M%S')}.csv"
+        self._buffer = zeros((100, 2))
+        self._n = 0
+    
+    def append(self, data: Tuple[float, float]):
+        if self._filename:
+            self._buffer[self._n, 0] = data[0]
+            self._buffer[self._n, 1] = data[1]
+            self._n += 1
+            if self._n >= self._buffer.shape[0]:
+                self.flush()
+        return self
+
+    def flush(self):
+        if self._filename:
+                f = open(self._filename, "a")
+                for i in range(0, self._n):
+                    f.write(f'{self._buffer[i, 0]},{self._buffer[i, 1]}\n')
+                f.close()
+                self._n = 0
+        return self
 
 def init_argparse() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -35,7 +63,25 @@ def init_argparse() -> argparse.ArgumentParser:
         dest='model',
         help='the output path of agent model (default=saved_model)'
     )
+    parser.add_argument(
+        "-s", "--stats",
+        action='store_true',
+        dest='stats',
+        help='activate the stats'
+    )
+    parser.add_argument(
+        "-t", "--time", default=43200,
+        dest='time', type=float,
+        help='stop after time (default=43200 sec. = 12 hours)'
+    )
     return parser
+
+def append_data(filename:str | None, data:ndarray):
+    if filename:
+        f = open(filename, "a")
+        for i in range(0, data.shape[0]):
+            f.write(f'{data[i, 0]},{data[i, 1]}\n')
+        f.close()
 
 def main():
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s %(name)s: %(message)s')
@@ -45,10 +91,12 @@ def main():
     args = parser.parse_args()
 
     logging.info("Loading environment ...")
+    
+    stats = StatsFile("stats") if args.stats else None
 
     robot = SimRobot(obstacles=ObstacleMapBuilder(size=0.2) \
         .rect((-5, -5), (5, 5))
-        .add((2,2))
+        .rand(10, random=Random(1234), min_distance=1, max_distance=3)
         .build())
 #    robot = Robot(
 #        robotHost="192.168.1.11",
@@ -56,7 +104,7 @@ def main():
 #    )
     env1:RobotEnv = Environment.create(environment=args.environment,
         robot=robot,
-        reward=stuck())
+        reward=fuzzy_stuck(distances=(0.1, 0.3, 0.7, 2.0), sensor_range=90))
 
     environment:EncodedRobotEnv = Environment.create(
         environment=EncodedRobotEnv,
@@ -64,7 +112,12 @@ def main():
     )
     logging.info("Loading agent ...")
     agent:Agent = Agent.load(directory=args.model,
-        environment=environment
+        environment=environment,
+#        summarizer=dict(
+#            directory='tensorboard',
+#            labels='all'
+#            flush=1
+#        ),
     )
 
     logging.info("Starting ...")
@@ -79,11 +132,13 @@ def main():
     discount = _DEFAULT_DISCOUNT
     frame_inter = int(1000 / _FPS)
     time_frame = pygame.time.get_ticks()
-    while running:
+    while running and robot.time() <= args.time:
         actions = agent.act(states=states)
         states, terminal, reward = environment.execute(actions=actions)
-        avg_rewards = avg_rewards * discount + reward * (1 - discount)
         agent.observe(terminal=terminal, reward=reward)
+        if stats:
+            stats.append((robot.time(), reward))
+        avg_rewards = discount * (avg_rewards  - reward) + reward
         t = pygame.time.get_ticks()
         if t > time_frame:
             window.set_robot(robot).set_reward(avg_rewards).render()
@@ -93,6 +148,12 @@ def main():
             if event.type == pygame.QUIT:
                 running = False
                 break
+
+        if terminal:
+            states = environment.reset()
+
+    if stats:
+        stats.flush()
     pygame.quit()
     logging.info("Closing agent ...")
     agent.close()

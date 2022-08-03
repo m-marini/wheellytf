@@ -1,4 +1,5 @@
 from math import radians
+from random import Random
 from typing import Tuple
 
 import numpy as np
@@ -82,6 +83,19 @@ class ObstacleMapBuilder:
         obstacle -- the coordinate of obstacle"""
         self._list.append(snap(location, self._size))
         return self
+
+    def rand(self, n: int, random:Random = Random(), center: Tuple[float, float]=(0,0), min_distance: float = 0, max_distance: float = 5):
+        i = 0
+        min_sqr_dist = min_distance * min_distance
+        max_sqr_dist = max_distance * max_distance
+        while i < n:
+            x = random.uniform(-max_distance, max_distance)
+            y = random.uniform(-max_distance, max_distance)
+            sqr_dist = x * x + y * y
+            if sqr_dist >= min_sqr_dist and sqr_dist <= max_sqr_dist:
+                self.add((x + center[0], y + center[1]))
+                i += 1
+        return self           
     
     def rect(self, point1:Tuple[float, float], point2:Tuple[float, float]):
         """Adds obstacle by creating a rectangle

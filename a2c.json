@@ -1,0 +1,27 @@
+{
+    "agent": "a2c",
+    "batch_size": 10,
+    "exploration": 0.01,
+    "network": [
+        {
+            "type": "dense",
+            "size": 100,
+            "dropout": 0.2,
+            "activation": "relu"
+        }, {
+            "type": "dense",
+            "size": 100,
+            "dropout": 0.5,
+            "activation": "relu"
+        }, {
+            "type": "dense",
+            "size": 100,
+            "dropout": 0.5,
+            "activation": "tanh"
+        }
+    ],
+    "saver": {
+        "directory": "saved-model",
+        "frequency": 100
+    }
+}

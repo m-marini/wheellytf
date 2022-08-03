@@ -1,8 +1,0 @@
-{
-    "agent": "a2c",
-    "batch_size": 10,
-    "saver": {
-        "directory": "saved-model",
-        "frequency": 100
-    }
-}

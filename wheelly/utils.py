@@ -1,4 +1,6 @@
+from functools import reduce
 from math import atan2, floor, nan, pi
+from typing import List, Tuple
 
 from numpy import ndarray, arctan2
 
@@ -70,3 +72,38 @@ def str_time_inter(interval: float, dec=1):
         result += f"{mm:02.0f}' "
     result += f'{ss:0{3 + dec}.{dec}f}"'
     return result
+
+def fuzzy_pos(x: float, range: float):
+    """Returns the fuzzy value of positivy in the range"""
+    return clip(x / range, 0, 1)
+
+def fuzzy_neg(x: float, range: float):
+    """Returns the fuzzy value of negativity in the range"""
+    return clip(-x / range, 0, 1)
+
+def fuzzy_not(x: float):
+    """Returns the fuzzy value of negation"""
+    return 1 - x
+
+def fuzzy_and(*args: float):
+    """Returns the fuzzy value of intersection"""
+    return min(args)
+
+def fuzzy_or(*args: float):
+    """Returns the fuzzy value of union"""
+    return max(args)
+
+def fuzzy_range(x:float, limits:Tuple[float, float, float, float]):
+    """Returns the fuzzy value of range"""
+    return fuzzy_and(fuzzy_pos(x - limits[0], limits[1] - limits[0]), fuzzy_neg(x - limits[3], limits[3] - limits[2]))
+
+def defuzzy(*fuzzy_set: Tuple[float, float], default_value: float = 0, ):
+    """ Returns the defuzzy value of a fuzzy set
+    Arguments:
+    default_value --  the default value
+    args -- the fuzzy set composed by list of value, weight"""
+    weights = map(lambda t: t[1], fuzzy_set)
+    w_def = 1 - max(map(lambda t: t[1], fuzzy_set))
+    w = w_def + sum(map(lambda t: t[1], fuzzy_set))
+    x = w_def  * default_value + sum(map(lambda t: t[0] * t[1], fuzzy_set))
+    return x / w

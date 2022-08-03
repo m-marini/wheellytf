@@ -1,20 +1,17 @@
 import logging
-from typing import Any, Callable
+from typing import Any
 
 import numpy as np
 from tensorforce import Environment
 
-from wheelly.encoders import (ClipEncoder, DictEncoder, FeaturesEncoder,
-                              GetEncoder, MergeEncoder, ScaleEncoder,
-                              SupplyEncoder, TilesEncoder, createSpace)
-from wheelly.robots import RobotAPI
+from wheelly.encoders import (Binary2BoxEncoder, ClipEncoder, DictEncoder,
+                              FeaturesEncoder, GetEncoder, MergeEncoder,
+                              ScaleEncoder, SupplyEncoder, TilesEncoder,
+                              createSpace)
 from wheelly.objectives import no_move
+from wheelly.robots import RobotAPI
 
 _logger = logging.getLogger(__name__)
-
-_REACTION_INTERVAL = 0.3
-_COMMAND_INTERVAL = 0.9
-_DEFAULT_INTERVAL = 0.01
 
 MIN_SENSOR_DIR = -90
 MAX_SENSOR_DIR = 90
@@ -143,11 +140,14 @@ class MockRobotEnv(Environment):
 
 class RobotEnv(Environment):
     """Base robot environment"""
-    def __init__(self, robot: RobotAPI,
+    def __init__(self,
+        robot: RobotAPI,
         reward=no_move(),
-        interval=_DEFAULT_INTERVAL,
-        reactionInterval=_REACTION_INTERVAL,
-        commandInterval=_COMMAND_INTERVAL):
+        interval=10e-3,
+        reaction_interval=3e-3,
+        command_interval=900e-3,
+        max_episode_time:float | None=None,
+        terminal_reward: float=-1):
         """Creates a Robot envinment
         
         Argument:
@@ -159,10 +159,12 @@ class RobotEnv(Environment):
         """
         super().__init__()
         self._robot = robot
-        self._reaction_interval = reactionInterval
-        self._command_interval = commandInterval
+        self._reaction_interval = reaction_interval
+        self._command_interval = command_interval
         self._interval = interval
         self._reward = reward
+        self._max_episode_time = max_episode_time
+        self._terminal_reward = terminal_reward
         
         self._started = False
         
@@ -199,17 +201,17 @@ class RobotEnv(Environment):
         if not self._started:
             self._robot.start()
             self._started = True
+        self._robot.reset()
         self._readStatus(0)
         return self._get_obs()
 
     def execute(self, actions):
         self._process_action(actions)
         status = self._readStatus(self._reaction_interval)
-        
-        reward = self._reward(status)
-
+        done = self._max_episode_time != None and self._robot.elapsed() > self._max_episode_time
+        reward = self._terminal_reward if done else self._reward(status)
         observation = self._get_obs()
-        return observation, False, reward
+        return observation, done, reward
 
     def close(self):
         if self._robot != None:
@@ -341,7 +343,8 @@ class EncodedRobotEnv(Environment):
         can_move_forward = GetEncoder(obs_encoder, "canMoveForward")
         contacts_flat = MergeEncoder.create(contacts_filter, can_move_forward)
         contacts_features = FeaturesEncoder.create(contacts_flat)
-        encoder = MergeEncoder.create(tiles_sensor, contacts_features)
+        binEncoder = MergeEncoder.create(tiles_sensor, contacts_features)
+        encoder = Binary2BoxEncoder(binEncoder)
         in_act_encoder = SupplyEncoder(createSpace(_ENCODED_ACTION), lambda: self._act)
         halt = GetEncoder(in_act_encoder, "halt")
         direction = ScaleEncoder(GetEncoder(in_act_encoder, "direction"),
@@ -396,5 +399,3 @@ class EncodedRobotEnv(Environment):
         """
         self._act = act
         return self._out_act_encoder.encode()
-
-_logger.debug(f"Module {__name__} loaded.")
