@@ -14,14 +14,14 @@ def test_features_space_float():
 def test_features_space_discrete():
     space = Discrete(3)
     encoder = FeaturesEncoder.create(SupplyEncoder(space, None))
-    bin_space = encoder.space()
+    bin_space = encoder.space
     assert isinstance(bin_space, MultiBinary)
     assert bin_space.n == 3
 
 def test_features_space_multidiscrete():
     space = MultiDiscrete(np.array([2,3]))
     encoder = FeaturesEncoder.create(SupplyEncoder(space, None))
-    bin_space = encoder.space()
+    bin_space = encoder.space
     assert isinstance(bin_space, MultiBinary)
     assert bin_space.n == 6
 

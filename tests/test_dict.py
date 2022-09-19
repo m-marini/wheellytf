@@ -12,7 +12,7 @@ def test_dict_space():
     encoder = DictEncoder(
         a=SupplyEncoder(space1, lambda: a),
         b=SupplyEncoder(space2, lambda: b))
-    result = encoder.space()
+    result = encoder.space
     assert isinstance(result, Dict)
     assert result.get("a") == space1
     assert result.get("b") == space2

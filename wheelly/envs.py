@@ -218,7 +218,7 @@ class RobotEnv(Environment):
             self._robot.close()
 
     def _readStatus(self, time: float):
-        """Reads the status of robot afetr a time interval
+        """Reads the status of robot after a time interval
         
         Arguments:
         time -- the time interval (sec)"""
@@ -344,7 +344,8 @@ class EncodedRobotEnv(Environment):
         contacts_flat = MergeEncoder.create(contacts_filter, can_move_forward)
         contacts_features = FeaturesEncoder.create(contacts_flat)
         binEncoder = MergeEncoder.create(tiles_sensor, contacts_features)
-        encoder = Binary2BoxEncoder(binEncoder)
+        obs_encoder = Binary2BoxEncoder(binEncoder)
+        encoder = DictEncoder(obs=obs_encoder)
         in_act_encoder = SupplyEncoder(createSpace(_ENCODED_ACTION), lambda: self._act)
         halt = GetEncoder(in_act_encoder, "halt")
         direction = ScaleEncoder(GetEncoder(in_act_encoder, "direction"),

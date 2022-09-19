@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+### Added
+
+- Issue #16: Create eligibility trace networks
+- Issue #29: Add wifi configuration CLP
+
+## [0.2.0] 2022-08-03
+
 ### Fixed
 
 - Issue #13: Standard reference system
@@ -14,6 +21,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 
+- Issue #9: Agent study
 - Issue #10: Add save model
 - Issue #12: Simulated environment
 - Issue #15: Simulate obstacles

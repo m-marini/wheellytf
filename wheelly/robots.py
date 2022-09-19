@@ -202,7 +202,7 @@ class Robot(RobotAPI):
     def can_move_forward(self):
         return self._status['canMoveForward'] == 1 if self._status else False
 
-    def can_move_forward(self):
+    def can_move_backward(self):
         return self._status['canMoveBackward'] == 1 if self._status else False
     
     def time(self):
@@ -211,6 +211,9 @@ class Robot(RobotAPI):
     def elapsed(self):
         return self._time - self._reset_time
 
+    def status(self) -> dict[str, Any]:
+        return self._status;
+    
     def close(self):
         if self._socket:
             self._socket.close()

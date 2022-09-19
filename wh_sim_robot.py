@@ -1,3 +1,10 @@
+"""Simulates the robot motion by acting a defined behavior in simulated environment:
+
+scan all around for 30 seconds while
+    move for 12 seconds at max speed to 140 DEG
+    turn for 2 seconds to -90 DEG
+
+"""
 import logging
 from math import floor
 

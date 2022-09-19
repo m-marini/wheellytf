@@ -1,3 +1,4 @@
+"""Tests the robot motion by moving it forward for for 2 seconds."""
 import logging
 import time
 

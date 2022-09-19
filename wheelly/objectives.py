@@ -1,7 +1,7 @@
 from typing import Any, Callable, Tuple
 
-from wheelly.utils import clip, defuzzy, fuzzy_and, fuzzy_not, fuzzy_pos, fuzzy_range
-from wheelly.robots import MAX_DISTANCE
+from wheelly.utils import defuzzy, fuzzy_and, fuzzy_not, fuzzy_pos, fuzzy_range
+
 
 def no_move(velocity_threshold:float=0.01)-> Callable[[dict[str, Any]], float]:
     """Reward function of no move behaviours"""

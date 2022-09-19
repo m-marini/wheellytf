@@ -1,0 +1,17 @@
+{
+    "agent": "dqn",
+    "batch_size": 10,
+    "exploration": 0.01,
+    "memory": 20,
+    "network": [
+        [
+            {"type": "retrieve", "tensors": ["obs"]},
+            {"type": "dense", "size": 100, "activation": "relu", "dropout": 0.2},
+            {"type": "register", "tensor": "layer1"}
+        ], [
+            {"type": "retrieve", "tensors": ["layer1"]},
+            {"type": "dense", "size": 100, "activation": "relu", "dropout": 0.5},
+            {"type": "dense", "size": 100, "activation": "tanh", "dropout": 0.5}
+        ]
+    ]
+}

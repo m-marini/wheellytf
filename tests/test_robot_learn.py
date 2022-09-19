@@ -21,7 +21,10 @@ def test_learn():
         agent='random',
         environment=wrapper)
     states = wrapper.reset()
-    assert states.shape == (NO_FEATURES, )
+    assert isinstance(states, dict)
+    assert isinstance(states['obs'], ndarray)
+    assert states['obs'].shape == (NO_FEATURES, )
+
     actions = agent.act(states)
     
     assert isinstance(actions, dict)
