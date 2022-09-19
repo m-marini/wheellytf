@@ -13,7 +13,7 @@ def test_get_space():
         c=Discrete(4)
     )
     encoder = GetEncoder(SupplyEncoder(space, None), "a")
-    result = encoder.space()
+    result = encoder.space
     assert result == space["a"]
 
 def test_get_space10():

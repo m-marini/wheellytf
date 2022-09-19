@@ -319,14 +319,14 @@ def test_features3():
 def test_tiles_space1():
     space = Box(-1,1,shape=(1,))
     encoder = TilesEncoder(SupplyEncoder(space, None), np.array([5]))
-    tiles_space = encoder.space()
+    tiles_space = encoder.space
     assert type(tiles_space) is MultiBinary
     assert tiles_space.n == 24
 
 def test_tiles_space2():
     space = Box(np.array([-1,-1]), np.array([1,1]))
     encoder = TilesEncoder(SupplyEncoder(space, None), np.array([2,3]))
-    tiles_space = encoder.space()
+    tiles_space = encoder.space
     assert type(tiles_space) is MultiBinary
     assert tiles_space.n == 8 * 12
 

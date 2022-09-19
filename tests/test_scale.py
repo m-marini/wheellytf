@@ -11,7 +11,7 @@ def test_scale_space1():
         low = np.array([10]),
         high = np.array([20])
     )
-    result = encoder.space()
+    result = encoder.space
     assert isinstance(result, Box)
 
     assert_equal(result, Box(np.array([10]), np.array([20])))

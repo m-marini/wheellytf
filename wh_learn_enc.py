@@ -1,18 +1,21 @@
+"""Trains a tensorforce agent defined by json file for robot encoded environment defined in json file
+of robot simulated environment"""
+
 import argparse
-from datetime import datetime
 import logging
+from datetime import datetime
 from random import Random
 from typing import Tuple
-from numpy import ndarray, zeros
 
 import pygame
+from numpy import ndarray, zeros
 from tensorforce import Environment
 from tensorforce.agents import Agent
 
 from wheelly.envs import EncodedRobotEnv, RobotEnv
 from wheelly.objectives import fuzzy_stuck
 from wheelly.renders import RobotWindow
-from wheelly.robots import Robot, SimRobot
+from wheelly.robots import SimRobot
 from wheelly.sims import ObstacleMapBuilder
 
 _DEFAULT_DISCOUNT = 0.99
@@ -59,15 +62,14 @@ def init_argparse() -> argparse.ArgumentParser:
         help='the json file with environment descriptor (default=environment.json)'
     )
     parser.add_argument(
-        "-m", "--model", default='saved-model',
+        "-m", "--model", default='models/default',
         dest='model',
-        help='the output path of agent model (default=saved_model)'
+        help='the path of agent model (default=models/default)'
     )
     parser.add_argument(
         "-s", "--stats",
-        action='store_true',
         dest='stats',
-        help='activate the stats'
+        help='activate and set the stats prefix filename'
     )
     parser.add_argument(
         "-t", "--time", default=43200,
@@ -92,7 +94,7 @@ def main():
 
     logging.info("Loading environment ...")
     
-    stats = StatsFile("stats") if args.stats else None
+    stats = StatsFile(args.stats) if args.stats else None
 
     robot = SimRobot(obstacles=ObstacleMapBuilder(size=0.2) \
         .rect((-5, -5), (5, 5))
@@ -110,7 +112,7 @@ def main():
         environment=EncodedRobotEnv,
         env=env1
     )
-    logging.info("Loading agent ...")
+    logging.info(f"Loading agent {args.model} ...")
     agent:Agent = Agent.load(directory=args.model,
         environment=environment,
 #        summarizer=dict(

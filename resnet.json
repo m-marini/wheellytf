@@ -1,0 +1,51 @@
+{
+    "agent": "tensorforce",
+    "memory": 20,
+    "update":{
+        "unit": "timesteps",
+        "batch_size": 10
+    },
+    "objective": {
+        "type": "policy_gradient"
+    },
+    "reward_estimation":{
+        "horizon": 1
+    },
+    "optimizer": {
+        "optimizer": "sgd"
+    },
+    "policy": {
+        "type": "parametrized_distributions",
+        "network": [
+            [
+                {"type": "dense", "size": 100, "activation": "relu"},
+                {"type": "register", "tensor": "layer1"}
+            ],[
+                {"type": "retrieve", "tensors": ["layer1"]},
+                {"type": "dense", "size": 100, "activation": "relu"},
+                {"type": "dense", "size": 100, "activation": "relu"},
+                {"type": "register", "tensor": "layer2"}
+            ],[
+                {"type": "retrieve", "tensors": ["layer2", "layer1"], "aggregation": "sum"},
+                {"type": "dense", "size": 100, "activation": "relu"},
+                {"type": "dense", "size": 100, "activation": "relu"},
+                {"type": "register", "tensor": "layer3"}
+            ],[
+                {"type": "retrieve", "tensors": ["layer3", "layer2"], "aggregation": "sum"},
+                {"type": "dense", "size": 100, "activation": "relu"},
+                {"type": "dense", "size": 100, "activation": "relu"},
+                {"type": "register", "tensor": "layer4"}
+            ],[
+                {"type": "retrieve", "tensors": ["layer4", "layer3"], "aggregation": "sum"},
+                {"type": "dense", "size": 100, "activation": "tanh"}
+            ]
+        ],
+        "distributions": {
+            "halt": {"type": "categorical", "temperature_mode": "global"},
+            "direction": {"type": "categorical"},
+            "speed": {"type": "categorical"},
+            "sensorAction": {"type": "categorical"}
+        },
+        "temperature": 0.434
+    }
+}

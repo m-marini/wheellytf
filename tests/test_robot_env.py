@@ -21,16 +21,19 @@ def test_space():
     )
     s = wrapper.states()
     assert s == {
-        "type": "float",
-        "shape": (NO_FEATURES,),
-        "min_value": 0.,
-        "max_value": 1.,
+        "obs": {
+            "type": "float",
+            "shape": (NO_FEATURES,),
+            "min_value": 0.,
+            "max_value": 1.,
+        }
     }
 
 def test_reset():
-    base_env: MockRobotEnv= Environment.create(
+    """base_env: MockRobotEnv= Environment.create(
             environment=MockRobotEnv
-    )
+    )"""
+    base_env: MockRobotEnv= MockRobotEnv()
     base_env.set_distance(0)
     base_env.set_sensor(-90)
     base_env.set_can_move_forward(0)
@@ -40,7 +43,7 @@ def test_reset():
     )
 
     obs1 = wrapper.reset()
-    assert isinstance(obs1, ndarray)
+    assert isinstance(obs1['obs'], ndarray)
     exp = zeros((NO_FEATURES), dtype=int8)
     exp[0] = 1
     exp[NO_TILES + 0] = 1
@@ -51,12 +54,10 @@ def test_reset():
     exp[6 * NO_TILES + 0] = 1
     exp[7 * NO_TILES + 0] = 1
     exp[NO_SENSOR_FEATURES + 0] = 1
-    assert_equal(obs1, exp)
+    assert_equal(obs1['obs'], exp)
 
 def test_step1():
-    base_env: MockRobotEnv= Environment.create(
-            environment=MockRobotEnv
-    )
+    base_env: MockRobotEnv= MockRobotEnv()
     base_env.set_distance(0)
     base_env.set_sensor(-90)
     base_env.set_can_move_forward(0)
@@ -73,7 +74,7 @@ def test_step1():
         "sensorAction": np.array([1]),
     }
     obs, done, reward = wrapper.execute(action)
-    assert isinstance(obs, ndarray)
+    assert isinstance(obs['obs'], ndarray)
     exp = zeros((NO_FEATURES), dtype=int8)
     exp[0] = 1
     exp[NO_TILES + 0] = 1
@@ -84,7 +85,7 @@ def test_step1():
     exp[6 * NO_TILES + 0] = 1
     exp[7 * NO_TILES + 0] = 1
     exp[NO_SENSOR_FEATURES + 0] = 1
-    assert_equal(obs, exp)
+    assert_equal(obs['obs'], exp)
 
     act1 = base_env.act()
     assert_equal(act1, {
@@ -95,9 +96,7 @@ def test_step1():
     })
 
 def test_step2():
-    base_env: MockRobotEnv= Environment.create(
-            environment=MockRobotEnv
-    )
+    base_env: MockRobotEnv= MockRobotEnv()
     base_env.set_distance(0)
     base_env.set_sensor(-90)
     base_env.set_can_move_forward(0)
@@ -114,7 +113,7 @@ def test_step2():
         "sensorAction": np.array([0]),
     }
     obs, done, reward = wrapper.execute(action)
-    assert isinstance(obs, ndarray)
+    assert isinstance(obs['obs'], ndarray)
     exp = zeros((NO_FEATURES), dtype=int8)
     exp[0] = 1
     exp[NO_TILES + 0] = 1
@@ -125,7 +124,7 @@ def test_step2():
     exp[6 * NO_TILES + 0] = 1
     exp[7 * NO_TILES + 0] = 1
     exp[NO_SENSOR_FEATURES + 0] = 1
-    assert_equal(obs, exp)
+    assert_equal(obs['obs'], exp)
 
     act1 = base_env.act()
     assert_equal(act1, {

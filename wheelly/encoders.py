@@ -7,6 +7,7 @@ class Encoder:
     def __init__(self, space: Space):
         self._space = space
 
+    @property    
     def space(self):
         return self._space
 
@@ -14,22 +15,19 @@ class Encoder:
         raise NotImplementedError()
 
     def spec(self) -> dict[Any]:
-        return spec(self._space)
+        return spec(self.space)
 
 class SupplyEncoder(Encoder):
     def __init__(self, space: Space, value: Callable[[], Any]):
         super().__init__(space)
         self._value = value
 
-    def space(self):
-        return self._space
-
     def encode(self):
         return self._value()
 
 class DictEncoder(Encoder):
     def __init__(self, **encoders: Encoder):
-        space_dict = {key: encoders[key].space() for key in encoders}
+        space_dict = {key: encoders[key].space for key in encoders}
         super().__init__(Dict(space_dict))
         self._encoders = encoders
 
@@ -38,7 +36,7 @@ class DictEncoder(Encoder):
 
 class GetEncoder(Encoder):
     def __init__(self, encoder: Encoder, key: str):
-        space = encoder.space()
+        space = encoder.space
         assert isinstance(space, Dict)
         assert space.get(key) != None, f"missing key '{key}'"
         super().__init__(space[key])
@@ -51,7 +49,7 @@ class GetEncoder(Encoder):
 class MergeEncoder(Encoder):
     @staticmethod
     def create(*encoders: Encoder):
-        s = encoders[0].space()
+        s = encoders[0].space
         if isinstance(s, MultiBinary):
             return MergeBinaryEncoder(*encoders)
         elif isinstance(s, Box):
@@ -64,17 +62,17 @@ class MergeEncoder(Encoder):
 class MergeBoxEncoder(Encoder):
     def __init__(self, *encoders: Encoder):
         for encoder in encoders:
-            assert isinstance(encoder.space(), Box) \
-                and len(encoder.space().shape) == 1
+            assert isinstance(encoder.space, Box) \
+                and len(encoder.space.shape) == 1
 
         k = 0
         for encoder in encoders:
-            k += encoder.space().shape[0]
+            k += encoder.space.shape[0]
         low = np.empty(k, np.float32)
         high = np.empty(k, np.float32)
         index = 0
         for encoder in encoders:
-            s = encoder.space()
+            s = encoder.space
             n = s.shape[0]
             low[index: index + n] = s.low
             high[index: index + n] = s.high
@@ -87,7 +85,7 @@ class MergeBoxEncoder(Encoder):
         result = np.empty(n, np.float32)
         index = 0
         for encoder in self._encoders:
-            s = encoder.space()
+            s = encoder.space
             n = s.shape[0]
             result[index: index + n] = encoder.encode()
             index += n
@@ -96,11 +94,11 @@ class MergeBoxEncoder(Encoder):
 class MergeDiscreteEncoder(Encoder):
     def __init__(self, *encoders: Encoder):
         for encoder in encoders:
-            assert isinstance(encoder.space(), Discrete) \
-                or isinstance(encoder.space(), MultiDiscrete)
+            assert isinstance(encoder.space, Discrete) \
+                or isinstance(encoder.space, MultiDiscrete)
         k = 0
         for encoder in encoders:
-            s = encoder.space()
+            s = encoder.space
             if isinstance(s, Discrete):
                 k += 1
             elif isinstance(s, MultiDiscrete):
@@ -108,7 +106,7 @@ class MergeDiscreteEncoder(Encoder):
         nvec = np.zeros(k,  dtype=np.int32)
         index = 0
         for encoder in encoders:
-            s = encoder.space()
+            s = encoder.space
             if isinstance(s, Discrete):
                 nvec[index] = s.n
                 index += 1
@@ -128,7 +126,7 @@ class MergeDiscreteEncoder(Encoder):
         index = 0
         for encoder in self._encoders:
             x = encoder.encode()
-            s = encoder.space()
+            s = encoder.space
             if isinstance(s, Discrete):
                 result[index] = x - s.start
                 index += 1
@@ -141,11 +139,11 @@ class MergeDiscreteEncoder(Encoder):
 class MergeBinaryEncoder(Encoder):
     def __init__(self, *encoders: Encoder):
         for encoder in encoders:
-            assert isinstance(encoder.space(), MultiBinary)
+            assert isinstance(encoder.space, MultiBinary)
 
         k = 0
         for encoder in encoders:
-            s = encoder.space()
+            s = encoder.space
             k += s.n
 
         super().__init__(MultiBinary(k))
@@ -155,7 +153,7 @@ class MergeBinaryEncoder(Encoder):
         result = np.zeros((self._space.n), dtype=np.int8)
         index = 0
         for encoder in self._encoders:
-            s = encoder.space()
+            s = encoder.space
             result[index: index + s.n] = encoder.encode()
             index += s.n
         return result
@@ -163,7 +161,7 @@ class MergeBinaryEncoder(Encoder):
 class ClipEncoder(Encoder):
     def __init__(self, encoder: Encoder, low: np.ndarray, high: np.ndarray):
         self._encoder = encoder
-        space = encoder.space()
+        space = encoder.space
         assert isinstance(space, Box)
         assert low.shape == space.low.shape
         assert high.shape == space.high.shape
@@ -176,7 +174,7 @@ class ClipEncoder(Encoder):
 class Binary2BoxEncoder(Encoder):
     def __init__(self, encoder: Encoder):
         self._encoder = encoder
-        space = encoder.space()
+        space = encoder.space
         assert isinstance(space, MultiBinary)
         super().__init__(Box(shape=(space.n,), low=0, high=1))
 
@@ -185,7 +183,7 @@ class Binary2BoxEncoder(Encoder):
 
 class ScaleEncoder(Encoder):
     def __init__(self, encoder: Encoder, low: np.ndarray, high: np.ndarray):
-        space = encoder.space()
+        space = encoder.space
         assert isinstance(space, Discrete)
         assert low.shape == (1,)
         assert high.shape == (1,)
@@ -194,13 +192,13 @@ class ScaleEncoder(Encoder):
 
     def encode(self) -> np.ndarray:
         x = self._encoder.encode()
-        s = self._encoder.space()
+        s = self._encoder.space
         return (x - s.start) * (self._space.high - self._space.low) / (s.n - 1) + self._space.low
 
 class FeaturesEncoder():
     @staticmethod
     def create(encoder: Encoder):
-        space = encoder.space()
+        space = encoder.space
         if isinstance(space, Discrete):
             return FeaturesDiscreteEncoder(encoder)
         elif isinstance(space, MultiDiscrete):
@@ -214,7 +212,7 @@ class FeaturesDiscreteEncoder(Encoder):
         Discrete space is converted in a MultyBinary of n features
         MultiDiscrete space is converted in n = prod(sizes) features (cartesian product)
         """
-        space = encoder.space()
+        space = encoder.space
         assert isinstance(space, Discrete)
         super().__init__(MultiBinary(space.n))
         self._encoder = encoder
@@ -225,7 +223,7 @@ class FeaturesDiscreteEncoder(Encoder):
         MultiDiscrete space is converted in n = prod(sizes) features (cartesian product)
         """
         x = self._encoder.encode()
-        s = self._encoder.space()
+        s = self._encoder.space
         result = np.zeros(self._space.n, dtype=np.uint8)
         index = x[0] - s.start
         result[index] = 1
@@ -237,7 +235,7 @@ class FeaturesMultiDiscreteEncoder(Encoder):
         Discrete space is converted in a MultyBinary of n features
         MultiDiscrete space is converted in n = prod(sizes) features (cartesian product)
         """
-        space = encoder.space()
+        space = encoder.space
         assert isinstance(space, MultiDiscrete)
         noFeatures = np.prod(space.nvec)
         super().__init__(MultiBinary(noFeatures))
@@ -250,7 +248,7 @@ class FeaturesMultiDiscreteEncoder(Encoder):
         """
         x = self._encoder.encode()
         result = np.zeros(self._space.n, dtype=np.uint8)
-        nvec = self._encoder.space().nvec
+        nvec = self._encoder.space.nvec
         k = 1
         index = 0
         for i in range(nvec.size-1, -1, -1):
@@ -330,7 +328,7 @@ def binary_features(x: np.ndarray, n: int):
 
 class TilesEncoder:
     def __init__(self, encoder: Encoder, sizes: np.ndarray):
-        space = encoder.space()
+        space = encoder.space
         assert isinstance(space,  Box), f"space {space} cannot be converted to tiles space"
         assert len(space.shape) == 1, f"space must have rank 1 {space.shape}"
         k = space.shape[0]
@@ -349,6 +347,7 @@ class TilesEncoder:
         self._offsets = offsets(k)
         self._tiles_space = MultiBinary((_no_tiling * no_tiles))
 
+    @property
     def space(self):
         """ Convert a Box space of rank 1 to tiles space
         Return a MultyiBinary space of n tiling x m tiles
@@ -362,7 +361,7 @@ class TilesEncoder:
         x: the vector in Box space
         """
         x = self._encoder.encode()
-        space = self._encoder.space()
+        space = self._encoder.space
         z = (x - space.low) / self._w
         t = tile(z, self._offsets)
         f = features(t, self._sizes1)

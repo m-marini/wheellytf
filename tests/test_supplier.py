@@ -9,7 +9,7 @@ from wheelly.encoders import SupplyEncoder
 def test_space1():
     space = Discrete(n=2)
     encoder = SupplyEncoder(space, lambda: np.array([1]))
-    result = encoder.space()
+    result = encoder.space
     assert result == space
     assert encoder.spec() == {
         'type': 'int',
@@ -27,7 +27,7 @@ def test_space2():
     space = MultiDiscrete((3,3))
     value= np.array([1, 2])
     encoder = SupplyEncoder(space, lambda: value)
-    result = encoder.space()
+    result = encoder.space
     assert result == space
     assert_equal(encoder.spec(),{
         'type': 'int',
@@ -46,7 +46,7 @@ def test_space_multidiscrete1():
     space = MultiDiscrete((3,3))
     value= np.array([1, 2]),
     encoder = SupplyEncoder(space, lambda: value)
-    result = encoder.space()
+    result = encoder.space
     assert result == space
     assert_equal(encoder.spec(),{
         'type': 'int',
@@ -64,7 +64,7 @@ def test_space_bin():
     space = MultiBinary(n=3)
     value= np.array([0, 1, 0]),
     encoder = SupplyEncoder(space, lambda: value)
-    result = encoder.space()
+    result = encoder.space
     assert result == space
     assert_equal(encoder.spec(),{
         'type': 'bool',
@@ -75,7 +75,7 @@ def test_space_box1():
     space = Box(low = -1, high = 1, shape=(2,))
     value= np.array([-0.5, 0.5]),
     encoder = SupplyEncoder(space, lambda: value)
-    result = encoder.space()
+    result = encoder.space
     assert result == space
     assert_equal(encoder.spec(),{
         'type': 'float',
@@ -104,7 +104,7 @@ def test_space_dict1():
         )
     )
     encoder = SupplyEncoder(space, None)
-    result = encoder.space()
+    result = encoder.space
     assert result == space
     assert_equal(encoder.spec(), {
         'a': {

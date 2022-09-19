@@ -1,3 +1,6 @@
+"""Trains the agent store in the model directory for the encoded enviroment
+of base environment specified by json file (undefined)"""
+
 import argparse
 import logging
 
@@ -11,7 +14,8 @@ from wheelly.renders import WINDOW_SIZE, RobotWindow
 FONT_NAME = 'freesans'
 FONT_SIZE = 20
 
-font:pygame.font.Font | None = None
+font: pygame.font.Font | None = None
+
 
 def init_argparse() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -20,7 +24,7 @@ def init_argparse() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "-v", "--version", action="version",
-        version = f"{parser.prog} version 0.1.0"
+        version=f"{parser.prog} version 0.1.0"
     )
     parser.add_argument(
         "-e", "--environment", default='robot.json',
@@ -34,29 +38,32 @@ def init_argparse() -> argparse.ArgumentParser:
     )
     return parser
 
+
 def render_info(window: pygame.Surface, string: str):
     text = font.render(string, True, (0, 0, 0))
-    #get the rect of the text
+    # get the rect of the text
     textRect = text.get_rect()
-    #set the position of the text
+    # set the position of the text
     textRect.center = (WINDOW_SIZE / 2, 10)
-    #add text to window
+    # add text to window
     window.blit(text, textRect)
     pygame.display.update()
 
+
 def main():
-    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s %(name)s: %(message)s')
+    logging.basicConfig(
+        level=logging.DEBUG, format='%(asctime)s %(levelname)s %(name)s: %(message)s')
     logging.getLogger("wheelly.envs.robot").setLevel(logging.DEBUG)
 #    logging.info(pygame.font.get_fonts())
     parser = init_argparse()
     args = parser.parse_args()
     pygame.init()
-    font = pygame.font.SysFont(FONT_NAME, FONT_SIZE) 
+    font = pygame.font.SysFont(FONT_NAME, FONT_SIZE)
 
     logging.info("Loading environment ...")
-    env1:RobotEnv = Environment.create(environment=args.environment)
+    env1: RobotEnv = Environment.create(environment=args.environment)
 
-    environment:EncodedRobotEnv = Environment.create(
+    environment: EncodedRobotEnv = Environment.create(
         environment=EncodedRobotEnv,
         env=env1
     )
@@ -90,7 +97,7 @@ def main():
             .sensor_dir(env1.sensor_dir()) \
             .render()
 
-         #   render_info(env1.window, f"Average reward {tot_rew / no_step}")
+        #   render_info(env1.window, f"Average reward {tot_rew / no_step}")
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -101,6 +108,7 @@ def main():
     logging.info("Closing environment ...")
     environment.close()
     logging.info("Completed.")
+
 
 if __name__ == '__main__':
     main()

@@ -9,7 +9,7 @@ from wheelly.encoders import Binary2BoxEncoder, SupplyEncoder
 def test_space():
     space = MultiBinary(3)
     encoder = Binary2BoxEncoder(SupplyEncoder(space, lambda:np.array([0, 1, 0])))
-    encoded_space = encoder.space()
+    encoded_space = encoder.space
     assert isinstance(encoded_space, Box)
     assert_equal(encoded_space.shape, (3,))
     assert_equal(encoded_space.low, 0)
