@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - Issue #16: Create eligibility trace networks
 - Issue #29: Add wifi configuration CLP
+- Issue #31: Save and load TD model
 
 ## [0.2.0] 2022-08-03
 

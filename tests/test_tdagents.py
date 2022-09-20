@@ -3,13 +3,13 @@ from math import log
 import tensorflow as tf
 from numpy.testing import assert_almost_equal
 from wheelly.tdagents import (TDAgent, choose_actions, flat_states, log_pi,
-                            unflat_actions)
+                              unflat_actions)
 from wheelly.tdlayers import (TDDense, TDGraph, TDRelu, TDSoftmax, TDState,
-                            TDTanh)
+                              TDTanh)
+from wheelly.tdlisteners import DataCollectorConsumer, KpiListenerBuilder
 
 import tests.fixtures as wfix
 from tests.mocks1 import ContinuousMockEnv
-from wheelly.tdlisteners import DataCollectorConsumer, KpiListenerBuilder
 
 
 def cases(num_cases: int = 30):

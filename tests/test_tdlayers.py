@@ -4,9 +4,8 @@ from math import exp, tanh
 import tensorflow as tf
 from numpy.testing import assert_almost_equal
 from tensorflow import Tensor, Variable
-from this import d
-from wheelly.tdlayers import (TDDense, TDLinear, TDRelu, TDSoftmax, TDState,
-                            TDTanh)
+from wheelly.tdlayers import (TDDense, TDGraph, TDLayer, TDLinear, TDRelu, TDSoftmax, TDState,
+                              TDTanh)
 
 random.seed = 1234
 
@@ -40,24 +39,24 @@ alpha = 1e-3
 
 def create_linear():
     return TDLinear.createProps(b=Variable(initial_value=[[lin_b0, lin_b1]],
-                                            dtype=tf.float32),
-                                 w=Variable(initial_value=[[lin_w0, lin_w1]], dtype=tf.float32))
+                                           dtype=tf.float32),
+                                w=Variable(initial_value=[[lin_w0, lin_w1]], dtype=tf.float32))
 
 
 def create_dense():
     return TDDense.createProps(eb=Variable(initial_value=[[dense_eb0, dense_eb1]], dtype=tf.float32, trainable=False),
-                                ew=Variable(initial_value=[[
-                                    dense_ew00, dense_ew01], [
-                                    dense_ew10, dense_ew11], [
-                                    dense_ew20, dense_ew21
-                                ]], dtype=tf.float32, trainable=False),
-                                b=Variable(initial_value=[
-                                           [lin_b0, lin_b1]], dtype=tf.float32),
-                                w=Variable(initial_value=[[
-                                    dense_w00, dense_w01], [
-                                    dense_w10, dense_w11], [
-                                    dense_w20, dense_w21
-                                ]], dtype=tf.float32))
+                               ew=Variable(initial_value=[[
+                                   dense_ew00, dense_ew01], [
+                                   dense_ew10, dense_ew11], [
+                                   dense_ew20, dense_ew21
+                               ]], dtype=tf.float32, trainable=False),
+                               b=Variable(initial_value=[
+                                   [lin_b0, lin_b1]], dtype=tf.float32),
+                               w=Variable(initial_value=[[
+                                   dense_w00, dense_w01], [
+                                   dense_w10, dense_w11], [
+                                   dense_w20, dense_w21
+                               ]], dtype=tf.float32))
 
 
 def create_softmax():
@@ -73,8 +72,36 @@ def create_state(name: str, node_props: dict[str, Tensor]):
         name: node_props
     }
     return TDState(props=props,
-                    graph=None,
-                    node_props=nodes)
+                   graph=None,
+                   node_props=nodes)
+
+
+def create_state1():
+    props = {
+        "lambda": tf.Variable(initial_value=tdlambda, dtype=tf.float32),
+        "alpha": tf.Variable(initial_value=alpha, dtype=tf.float32),
+    }
+    forward = [
+        TDDense("a"),
+        TDTanh("b"),
+        TDSoftmax("c")
+    ]
+    graph = TDGraph(forward=forward,
+                    inputs=dict(a=["input"],
+                                b=["a"],
+                                c=["b"]),
+                    outputs=dict(a=["b"],
+                                 b=["c"],
+                                 c=[])
+                    )
+    random = tf.random.Generator.from_seed(1234)
+    nodes = dict(a=TDDense.initProps(num_inputs=3,
+                                     num_outputs=4,
+                                     random=random),
+                 c=TDSoftmax.initProps(1.0))
+    return TDState(props=props,
+                   graph=graph,
+                   node_props=nodes)
 
 
 def test_state():
@@ -118,8 +145,8 @@ def test_train_linear():
     delta = 0.2
 
     state1, grad_post = layer.train(inputs=[inp],
-                                  output=out,
-                                  grad=tf.constant(
+                                    output=out,
+                                    grad=tf.constant(
         [[grad0, grad1]], dtype=tf.float32),
         delta=tf.constant(
         [[delta]], dtype=tf.float32),
@@ -155,8 +182,8 @@ def test_train_relu():
     delta = 0.2
 
     state1, grad_post = layer.train(inputs=[inp],
-                                  output=out,
-                                  grad=tf.constant(
+                                    output=out,
+                                    grad=tf.constant(
         [[grad0, grad1]], dtype=tf.float32),
         delta=tf.constant(
         [[delta]], dtype=tf.float32),
@@ -196,8 +223,8 @@ def test_train_tanh():
     delta = 0.2
 
     state1, grad_post = layer.train(inputs=[inp],
-                                  output=out,
-                                  grad=tf.constant(
+                                    output=out,
+                                    grad=tf.constant(
         [[grad0, grad1, grad2]], dtype=tf.float32),
         delta=tf.constant(
         [[delta]], dtype=tf.float32),
@@ -279,8 +306,8 @@ def test_train_dense():
     delta = 0.2
 
     state1, grad_post = layer.train(inputs=[inp],
-                                  output=out,
-                                  grad=tf.constant(
+                                    output=out,
+                                    grad=tf.constant(
         [[grad0, grad1]], dtype=tf.float32),
         delta=tf.constant(
         [[delta]], dtype=tf.float32),
@@ -363,8 +390,8 @@ def test_train_softmax():
     delta = 0.2
 
     state1, grad_post = layer.train(inputs=[inp],
-                                  output=out,
-                                  grad=tf.constant(
+                                    output=out,
+                                    grad=tf.constant(
         [[grad0, grad1, grad2]], dtype=tf.float32),
         delta=tf.constant(
         [[delta]], dtype=tf.float32),
@@ -386,3 +413,119 @@ def test_train_softmax():
                              (1 - pi1) - grad2 * pi2 * pi1) / temperature,
                             (-grad0 * pi0 * pi2 - grad1 * pi1 * pi2 + grad2 * pi2 * (1 - pi2)) / temperature]])
     assert state1 == state
+
+
+def test_tanh_by_spec():
+    spec = dict(name="name", type="tanh")
+    random = tf.random.Generator.from_seed(1234)
+    layer, props = TDLayer.by_spec(spec=spec, random=random)
+    assert isinstance(layer, TDTanh)
+    assert props is None
+    assert layer.spec(props) == spec
+
+
+def test_relu_by_spec():
+    spec = dict(name="name", type="relu")
+    random = tf.random.Generator.from_seed(1234)
+    layer, props = TDLayer.by_spec(spec=spec, random=random)
+    assert isinstance(layer, TDRelu)
+    assert props is None
+    assert layer.spec(props) == spec
+
+
+def test_softmax_by_spec():
+    spec = dict(name="name", type="softmax")
+    random = tf.random.Generator.from_seed(1234)
+    layer, props = TDLayer.by_spec(spec=spec, random=random)
+    assert isinstance(layer, TDSoftmax)
+    assert_almost_equal(props["temperature"].numpy(), 1)
+    assert layer.spec(props) == spec
+
+
+def test_linear_by_spec():
+    spec = dict(name="name", type="linear")
+    random = tf.random.Generator.from_seed(1234)
+    layer, props = TDLayer.by_spec(spec=spec, random=random)
+    assert isinstance(layer, TDLinear)
+    assert_almost_equal(props["b"].numpy(), 0)
+    assert_almost_equal(props["w"].numpy(), 1)
+    assert layer.spec(props) == spec
+
+
+def test_dense_by_spec():
+    spec = dict(name="name", type="dense", num_inputs=3, num_outputs=4)
+    random = tf.random.Generator.from_seed(1234)
+    layer, props = TDLayer.by_spec(spec=spec, random=random)
+    assert isinstance(layer, TDDense)
+    assert props["eb"].shape == (1, 4)
+    assert props["b"].shape == (1, 4)
+    assert props["ew"].shape == (3, 4)
+    assert props["w"].shape == (3, 4)
+    assert layer.spec(props) == spec
+
+
+def test_net_spec():
+
+    net = create_state1()
+
+    spec = net.spec()
+
+    assert spec == [
+        {
+            "name": "a",
+            "type": "dense",
+            "num_inputs": 3,
+            "num_outputs": 4,
+            "inputs": ["input"]
+        }, {
+            "name": "b",
+            "type": "tanh",
+            "inputs": ["a"]
+        }, {
+            "name": "c",
+            "type": "softmax",
+            "inputs": ["b"]
+        }
+    ]
+
+
+def test_net_by_spec():
+    spec = [
+        {
+            "name": "a",
+            "type": "dense",
+            "num_inputs": 3,
+            "num_outputs": 4,
+            "inputs": ["input"]
+        }, {
+            "name": "b",
+            "type": "tanh",
+            "inputs": ["a"]
+        }, {
+            "name": "c",
+            "type": "softmax",
+            "inputs": ["b"]
+        }
+    ]
+    random = tf.random.Generator.from_seed(1234)
+    state = TDState.by_spec(spec=spec, random=random)
+    assert_almost_equal(state.prop("alpha").numpy(), 1e-3)
+    assert_almost_equal(state.prop("lambda").numpy(), 0)
+    assert len(state.graph.forward) == 3
+    assert isinstance(state.graph.forward[0], TDDense)
+    assert isinstance(state.graph.forward[1], TDTanh)
+    assert isinstance(state.graph.forward[2], TDSoftmax)
+    assert state.graph.forward[0].name == "a"
+    assert state.graph.forward[1].name == "b"
+    assert state.graph.forward[2].name == "c"
+    assert state.graph._inputs["a"] == ["input"]
+    assert state.graph._inputs["b"] == ["a"]
+    assert state.graph._inputs["c"] == ["b"]
+    assert state.graph._outputs["a"] == ["b"]
+    assert state.graph._outputs["b"] == ["c"]
+    assert state.graph._outputs["c"] == []
+    assert state.node_prop("a", "eb").shape == (1, 4)
+    assert state.node_prop("a", "ew").shape == (3, 4)
+    assert state.node_prop("a", "b").shape == (1, 4)
+    assert state.node_prop("a", "w").shape == (3, 4)
+    assert_almost_equal(state.node_prop("c", "temperature").numpy(), 1)
