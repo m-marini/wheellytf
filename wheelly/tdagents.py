@@ -1,248 +1,40 @@
+from __future__ import annotations
+
+import json
 from typing import Any, Callable
 
 import numpy as np
 import tensorflow as tf
 from tensorflow import Tensor
 
-from wheelly.tdlayers import (TDDense, TDGraph, TDLayer, TDRelu, TDSoftmax,
-                            TDState, TDTanh, td_forward, td_train)
+from wheelly.tdlayers import TDState, flat_type_spec, td_forward, td_train
 
 
-def create_layer(name: str, spec: dict[str, Any]) -> TDLayer:
-    """Creates a layer
+class TDAgent(tf.train.Checkpoint):
 
-    Arguments:
-    spec -- the layer specification"""
-    type = spec["type"]
-    if type == "dense":
-        return TDDense(name)
-    elif type == "relu":
-        return TDRelu(name)
-    elif type == "tanh":
-        return TDTanh(name)
-    elif type == "softmax":
-        return TDSoftmax(name)
-    else:
-        raise Exception(f'Layer type "{type}" not supported')
+    @ staticmethod
+    def load(path: str) -> TDAgent:
+        with open(path + "/agent.json") as json_file:
+            spec = json.load(json_file)
+        agent = TDAgent.by_spec(spec, random=tf.random.get_global_generator())
+        file = tf.train.latest_checkpoint(checkpoint_dir=path)
+        agent.restore(file)
+        return agent
 
+    @ staticmethod
+    def by_spec(spec: dict[str, Any],
+                random: tf.random.Generator) -> TDAgent:
+        states_spec = spec["state_spec"]
+        actions_spec = spec["actions_spec"]
+        critic = TDState.by_spec(spec=spec["critic"], random=random)
+        policy = TDState.by_spec(spec=spec["policy"], random=random)
+        return TDAgent(states_spec=states_spec,
+                       actions_spec=actions_spec,
+                       critic=critic,
+                       policy=policy,
+                       reward_alpha=1.0,
+                       random=random)
 
-def find_outputs(spec: dict[str, Any], layer_name: str) -> list[str]:
-    """Returns the outputs of a layer
-
-    Arguments:
-    spec -- the full ayers specification
-    layer_name -- the layer name to find the output for"""
-
-    result = [key for key, layer_spec in spec.items() if key !=
-              layer_name and layer_spec["input"] == layer_name]
-
-    """
-    result = []
-    for key in spec:
-        if key != layer_name and spec["input"] == layer_name:
-            result.append(key)
-    """
-    return result
-
-
-def create_graph(spec: dict[str, Any]) -> TDGraph:
-    """Returns the graph for a lyaer specification"
-
-    Arguments:
-    spec -- the full layer specification"""
-    names = sort_layers(spec)
-    forward = [create_layer(name=name, spec=spec[name]) for name in names]
-    inputs = {key: [layer_spec["input"]] for key, layer_spec in spec.items()}
-    outputs = {key: find_outputs(spec=spec, layer_name=key) for key in spec}
-
-    return TDGraph(forward=forward, inputs=inputs, outputs=outputs)
-
-
-def flat_type_spec(spec: dict[str, Any], prefix: str) -> dict[str, Any]:
-    """Returns the flat type specification
-
-    Arguments:
-    spec -- the type specification
-    prefix -- the prefix of the flat type"""
-    result = {}
-    def flat(prefix: str,
-             spec: dict[str, Any]):
-        if "type" in spec:
-            result[prefix] = spec
-        else:
-            for key, sub_spec in spec.items():
-                flat(prefix=f"{prefix}.{key}",
-                     spec=sub_spec)
-
-    flat(spec=spec, prefix=prefix)
-    return result
-
-
-def get_output_size(spec: dict[str, Any]) -> int:
-    """Returns the size of output of a layer specification
-
-    Argument:
-    spec -- the single layer specification"""
-    assert "type" in spec, "Missing type"
-    type = spec["type"]
-    if type == "dense":
-        assert "size" in spec, "Missing size"
-        return spec["size"]
-    else:
-        return spec["inp_size"]
-
-
-def parse_for_size(layers_spec: dict[str, Any], state_spec: dict[str, Any]):
-    """Returns the layer specification agumented by infered inp_size and size
-
-    Arguments:
-    layers_spec -- the full layer specification
-    state_spec -- the flatten state type specification"""
-    sorted = sort_layers(layers_spec)
-    for name in sorted:
-        spec = layers_spec[name]
-        input = spec["input"]
-        if input in layers_spec:
-            spec["inp_size"] = layers_spec[input]["size"]
-        else:
-            inp_spec = state_spec[input]
-            assert "shape" in inp_spec, f'Missing shape for "{input}"'
-            shape = inp_spec["shape"]
-            assert len(shape) == 1, f'Shape rank must be 1 ({len(shape)})'
-            spec["inp_size"] = shape[0]
-        spec["size"] = get_output_size(spec)
-    return layers_spec
-
-
-def sort_layers(layers_spec: dict[str, Any]) -> list[str]:
-    """Returns the sorted layers for forward pass
-
-    Arguments:
-    layers_spec -- the full layer specification"""
-    inputs = set()
-    for spec in layers_spec.values():
-        inputs.add(spec["input"])
-
-    sinks = [name for name in layers_spec if name not in inputs]
-
-    ordered = []
-
-    def sort(node: str):
-        if node not in ordered and node in layers_spec:
-            sort(layers_spec[node]["input"])
-            ordered.append(node)
-
-    for node in sinks:
-        sort(node)
-    return ordered
-
-
-def parse_for_inputs(net_spec: dict[str, Any], state_spec: dict[str, Any]) -> dict[str, Any]:
-    """Returns the expanded full layers specification
-
-    Arguments:
-    net_spec -- the network specification
-    state_spec -- the flatten state type specification """
-    layers_spec = {}
-    for seq_name, seq_spec in net_spec.items():
-        input = seq_spec.get("input", "input")
-        layers = seq_spec["layers"]
-        n = len(layers)
-        for i in range(n):
-            layer_spec = layers[i].copy()
-            layer_name = seq_name if i >= n - 1 else f"{seq_name}[{i}]"
-            layer_spec["input"] = input
-            layers_spec[layer_name] = layer_spec
-            input = layer_name
-    for spec in layers_spec.values():
-        input = spec["input"]
-        assert (input in layers_spec) or (
-            input in state_spec), f'Input "{input}" undefined'
-    return layers_spec
-
-
-def validate_output(layers_spec: dict[str, Any], output_spec=dict[str, Any]):
-    """Validate the layers specification for output definition
-
-    Arguments:
-    layers_spec -- the full layer specification
-    output_spec -- the flatten output specification"""
-    for name, spec in output_spec.items():
-        assert name in layers_spec, f'Missing output for "{name}"'
-        assert "type" in spec, f'Missing "type" spec for "{name}"'
-        assert "shape" in spec, f'Missing "shape" spec for "{name}"'
-        type = spec["type"]
-        shape = spec["shape"]
-        assert len(
-            shape) == 1, f'Shape rank must be = 1 for "{name} ({len(shape)})'
-        if type == "int":
-            assert shape[0] == 1, f'Shape must be = 1 for "{name} ({shape[0]})'
-            assert "num_values" in spec, f'Missing "num_values" spec for "{name}"'
-            num_values = spec["num_values"]
-            assert layers_spec[name]["size"] == num_values, \
-                f'Unmatched size for "{name}" ({layers_spec[name]["size"]}) != ({num_values})'
-        else:
-            assert layers_spec[name]["size"] == shape[0], \
-                f'Unmatched size for "{name}" ({layers_spec[name]["size"]}) != ({shape[0]})'
-
-
-def create_layer_props(spec: dict[str, Any], random: tf.random.Generator) -> dict[str, Tensor] | None:
-    """Returns the initial properties of a layer or None if not available
-
-    Arguments:
-    spec -- layer specification
-    random -- the random generator"""
-    type = spec["type"]
-    if type == "dense":
-        return TDDense.initProps(num_inputs=spec["inp_size"], num_outputs=spec["size"], random=random)
-    elif type == "softmax":
-        return TDSoftmax.initProps(temperature=tf.constant(spec.get("temperature", 1), dtype=tf.float32))
-    else:
-        return None
-
-
-def create_layers_props(spec: dict[str, Any], random: tf.random.Generator) -> dict[str, dict[str, Tensor]]:
-    """Returns the initial properties of the layers
-
-    Arguments:
-    spec -- full layers specification
-    random -- the random generator"""
-    result = {}
-    for key, layer_spec in spec.items():
-        props = create_layer_props(spec=layer_spec, random=random)
-        if props is not None:
-            result[key] = props
-    return result
-
-
-def create_network(net_spec: dict[str, Any],
-                   state_spec: dict[str, Any],
-                   actions_spec: dict[str, Any],
-                   random: tf.random.Generator) -> TDState:
-    """Returns the network state from network specification
-
-    Arguments:
-    net_spec -- network specification
-    state_spec -- flatten state specification
-    actions_spec -- flatten actions specification
-    random -- the random generator"""
-    assert "alpha" in net_spec, f'Missing "alpha" parameter'
-    assert "lambda" in net_spec, f'Missing "lambda" parameter'
-    assert "network" in net_spec, f'Missing "network" parameter'
-    props = {"alpha": net_spec["alpha"],
-             "lambda": net_spec["lambda"]}
-    net_spec1 = net_spec["network"]
-    layers_spec = parse_for_inputs(net_spec=net_spec1, state_spec=state_spec)
-    layers_spec = parse_for_size(
-        layers_spec=layers_spec, state_spec=state_spec)
-    validate_output(layers_spec=layers_spec, output_spec=actions_spec)
-    graph = create_graph(layers_spec)
-    node_props = create_layers_props(spec=layers_spec, random=random)
-
-    return TDState(props=props, graph=graph, node_props=node_props)
-
-
-class TDAgent:
     @ staticmethod
     def create(state_spec: dict[str, Any],
                actions_spec: dict[str, Any],
@@ -259,7 +51,7 @@ class TDAgent:
         flatten_actions = flat_type_spec(spec=actions_spec, prefix="output")
         reward_alpha = agent_spec.get("reward_alfa", 0.1)
         assert "critic" in agent_spec, f'Missing "critic" specification'
-        critic = create_network(net_spec=agent_spec["critic"],
+        critic = TDState.create(net_spec=agent_spec["critic"],
                                 state_spec=flatten_state,
                                 actions_spec=dict(output=dict(
                                     type="float",
@@ -267,16 +59,16 @@ class TDAgent:
                                 )),
                                 random=random)
         assert "policy" in agent_spec, f'Missing "policy" specification'
-        policy = create_network(net_spec=agent_spec["policy"],
+        policy = TDState.create(net_spec=agent_spec["policy"],
                                 state_spec=flatten_state,
                                 actions_spec=flatten_actions,
                                 random=random)
         agent = TDAgent(states_spec=state_spec,
-                         actions_spec=actions_spec,
-                         policy=policy,
-                         critic=critic,
-                         reward_alpha=reward_alpha,
-                         random=random)
+                        actions_spec=actions_spec,
+                        policy=policy,
+                        critic=critic,
+                        reward_alpha=reward_alpha,
+                        random=random)
         return agent
 
     def __init__(self,
@@ -286,29 +78,23 @@ class TDAgent:
                  critic: TDState,
                  reward_alpha: float,
                  random: tf.random.Generator):
-        self._states_spec = states_spec
-        self._actions_spec = actions_spec
+        super().__init__()
+        self.states_spec = states_spec
+        self.actions_spec = actions_spec
         self._flatten_states_spec = flat_type_spec(
             spec=states_spec, prefix="input")
         self._flatten_actions_spec = flat_type_spec(
             spec=actions_spec, prefix="output")
-        self._policy = policy
-        self._random = random
-        self._critic = critic
-        self._reward_alpha = reward_alpha
-        self._avg_reward = tf.Variable(initial_value=[0],
-                                       dtype=tf.float32,
-                                       trainable=False)
+        self.policy = policy
+        self.random = random
+        self.critic = critic
+        self.reward_alpha = tf.Variable(
+            initial_value=reward_alpha, trainable=False)
+        self.avg_reward = tf.Variable(initial_value=[0],
+                                      dtype=tf.float32,
+                                      trainable=False)
         self._prev_inputs = None
         self._kpi_listeners: list[Callable[[dict[str, Any]], None]] = []
-
-    @ property
-    def states_spec(self):
-        return self._states_spec
-
-    @ property
-    def actions_spec(self):
-        return self._actions_spec
 
     def act(self, states: Any) -> dict[str, Any] | int | float:
         """Returns the action for a states based on current policy
@@ -318,9 +104,9 @@ class TDAgent:
         policy_status, inputs = self._policy_status(states=states)
         pis = {key: value for key,
                value in policy_status.items() if key in self._flatten_actions_spec}
-        flatten_action = choose_actions(flatten_pis=pis, random=self._random)
+        flatten_action = choose_actions(flatten_pis=pis, random=self.random)
         actions = unflat_actions(
-            flatten=flatten_action, actions_spec=self._actions_spec,)
+            flatten=flatten_action, actions_spec=self.actions_spec,)
         self._last_actions = actions
         self._last_inputs = inputs
         self._last_policy = policy_status
@@ -361,7 +147,7 @@ class TDAgent:
         states -- the states"""
         inputs = flat_states(states)
         policy_status = td_forward(inputs=inputs,
-                                    state=self._policy)
+                                   state=self.policy)
         return policy_status, inputs
 
     def _train(self, s0: dict[str, Tensor],
@@ -370,30 +156,30 @@ class TDAgent:
                terminal: bool,
                s1: dict[str, Tensor]):
 
-        c0 = td_forward(state=self._critic, inputs=s0)
-        c1 = td_forward(state=self._critic, inputs=s1)
+        c0 = td_forward(state=self.critic, inputs=s0)
+        c1 = td_forward(state=self.critic, inputs=s1)
         v0 = c0["output"]
         v1 = c1["output"]
-        delta = reward - self._avg_reward + v1 - v0
+        delta = reward - self.avg_reward + v1 - v0
         pi = self._prev_policy
         dc = dict(output=tf.ones(shape=(1, 1)))
-        dp = log_pi(pi=pi, action=actions, actions_spec=self._actions_spec)
+        dp = log_pi(pi=pi, action=actions, actions_spec=self.actions_spec)
 
-        avg_reward = tf.constant(self._avg_reward)
-        self._avg_reward.assign_add(delta=delta[0] * self._reward_alpha)
-        _, grad_c = td_train(state=self._critic,
-                              nodes=c0,
-                              grad_loss=dc,
+        avg_reward = tf.constant(self.avg_reward)
+        self.avg_reward.assign_add(delta=delta[0] * self.reward_alpha)
+        _, grad_c = td_train(state=self.critic,
+                             nodes=c0,
+                             grad_loss=dc,
+                             delta=delta)
+        _, grad_pi = td_train(state=self.policy,
+                              nodes=pi,
+                              grad_loss=dp,
                               delta=delta)
-        _, grad_pi = td_train(state=self._policy,
-                               nodes=pi,
-                               grad_loss=dp,
-                               delta=delta)
 
         if len(self._kpi_listeners) > 0:
-            trained_c0 = td_forward(state=self._critic, inputs=s0)
-            trained_c1 = td_forward(state=self._critic, inputs=s1)
-            trained_pi = td_forward(state=self._policy, inputs=s0)
+            trained_c0 = td_forward(state=self.critic, inputs=s0)
+            trained_c1 = td_forward(state=self.critic, inputs=s1)
+            trained_pi = td_forward(state=self.policy, inputs=s0)
 
             kpis = dict(
                 s0=s0,
@@ -402,7 +188,7 @@ class TDAgent:
                 actions=actions,
                 s1=s1,
                 avg_reward=avg_reward,
-                trained_avg_reward=tf.constant(self._avg_reward),
+                trained_avg_reward=tf.constant(self.avg_reward),
                 c0=c0,
                 c1=c1,
                 delta=delta,
@@ -425,6 +211,21 @@ class TDAgent:
         Arguments:
         callback -- the call back listener"""
         self._kpi_listeners.append(callback)
+
+    def spec(self):
+        result = dict(state_spec=self.states_spec,
+                      actions_spec=self.actions_spec,
+                      critic=self.critic.spec(),
+                      policy=self.policy.spec()
+                      )
+        return result
+
+    def save_model(self, path: str):
+        tf.train.CheckpointManager(
+            checkpoint=self, directory=path, max_to_keep=1).save()
+        with open(path + "/agent.json", "w", encoding="utf-8") as f:
+            agent_spec = self.spec()
+            json.dump(agent_spec, f, ensure_ascii=False)
 
 
 def log_pi(pi: dict[str, Tensor],
@@ -499,7 +300,7 @@ def choose_actions(flatten_pis: dict[str, Tensor],
 
 
 def unflat_actions(actions_spec: dict[str, Any],
-                    flatten: dict[str, int]) -> dict[str, Any] | int | float:
+                   flatten: dict[str, int]) -> dict[str, Any] | int | float:
     """Returns the unflatten actions
 
     Arguments:
