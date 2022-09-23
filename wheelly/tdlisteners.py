@@ -1,5 +1,4 @@
 from __future__ import annotations
-from selectors import SelectSelector
 
 from types import NoneType
 from typing import Any, Callable

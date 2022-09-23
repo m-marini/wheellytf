@@ -4,11 +4,11 @@ of simulated environment"""
 import argparse
 import logging
 import tensorflow as tf
-from random import Random
-
+import json
 import pygame
 from tensorforce import Environment
 
+from random import Random
 from wheelly.envs import EncodedRobotEnv, RobotEnv
 from wheelly.tdlisteners import CsvConsumer, DiscountConsumer, KpiListenerBuilder
 from wheelly.objectives import fuzzy_stuck
@@ -16,6 +16,7 @@ from wheelly.renders import RobotWindow
 from wheelly.robots import SimRobot
 from wheelly.sims import ObstacleMapBuilder
 from wheelly.tdagents import TDAgent
+from wheelly.transpiller import AgentTranspiller
 
 _FPS = 60
 
@@ -37,6 +38,21 @@ def init_argparse() -> argparse.ArgumentParser:
         help='the json file with environment descriptor (default=environment.json)'
     )
     parser.add_argument(
+        "-a", "--agent",
+        dest='agent',
+        help='the json file with agent descriptor (default=agent.json)'
+    )
+    parser.add_argument(
+        "-m", "--model", default='./models/default',
+        dest='model',
+        help='the model path to load and store (default=./models/default)'
+    )
+    parser.add_argument(
+        "-n", "--num", default=300,
+        dest='num', type=float,
+        help='number of steps between save (default=300)'
+    )
+    parser.add_argument(
         "-t", "--time", default=43200,
         dest='time', type=float,
         help='stop after time (default=43200 sec. = 12 hours)'
@@ -49,79 +65,16 @@ def init_argparse() -> argparse.ArgumentParser:
     return parser
 
 
-def agent_spec():
-    alpha = 30e-3
-    tdlambda = 0.5
-    reward_alpha = 5e-3
-    temperature = 0.4
-    hidden_size = 100
-    return{
-        "reward_alpha": reward_alpha,
-        "critic": {
-            "alpha": alpha,
-            "lambda": tdlambda,
-            "network": {
-                "output": {
-                    "input": "input.obs",
-                    "layers": [
-                        {"type": "dense", "size": hidden_size},
-                        {"type": "relu"},
-                        {"type": "dense", "size": hidden_size},
-                        {"type": "relu"},
-                        {"type": "dense", "size": 1},
-                        {"type": "tanh"},
-                    ]
-                }
-            }
-        },
-        "policy": {
-            "alpha": alpha,
-            "lambda": tdlambda,
-            "network": {
-                "features": {
-                    "input": "input.obs",
-                    "layers": [
-                        {"type": "dense", "size": hidden_size},
-                        {"type": "relu"},
-                        {"type": "dense", "size": hidden_size},
-                        {"type": "relu"},
-                    ]
-                },
-                "output.halt": {
-                    "input": "features",
-                    "layers": [
-                        {"type": "dense", "size": 2},
-                        {"type": "tanh"},
-                        {"type": "softmax", "temperature": temperature},
-                    ]
-                },
-                "output.direction": {
-                    "input": "features",
-                    "layers": [
-                        {"type": "dense", "size": 25},
-                        {"type": "tanh"},
-                        {"type": "softmax", "temperature": temperature},
-                    ]
-                },
-                "output.speed": {
-                    "input": "features",
-                    "layers": [
-                        {"type": "dense", "size": 9},
-                        {"type": "tanh"},
-                        {"type": "softmax", "temperature": temperature},
-                    ]
-                },
-                "output.sensorAction": {
-                    "input": "features",
-                    "layers": [
-                        {"type": "dense", "size": 7},
-                        {"type": "tanh"},
-                        {"type": "softmax", "temperature": 0.8},
-                    ]
-                }
-            }
-        }
-    }
+def create_agent(env: Environment, random: tf.random.Generator, args):
+    if args.agent is not None:
+        with open(args.agent) as json_file:
+            spec = json.load(json_file)
+        logging.info(f"Creating agent from {args.agent} ...")
+        return AgentTranspiller.byEnv(env=env, spec=spec).build(random)
+    else:
+        logging.info(f"Loading model {args.model} ...")
+        agent = TDAgent.load(args.model)
+        return agent
 
 
 def flush_tracers(tracers: list[CsvConsumer]):
@@ -134,6 +87,7 @@ def reward_tracers(agent: TDAgent, folder: str) -> list[CsvConsumer]:
         KpiListenerBuilder.getter("reward")
         .register(agent, CsvConsumer(folder + "/reward.csv"))
     ]
+
 
 def full_tracers(agent: TDAgent, folder: str) -> list[CsvConsumer]:
     return [
@@ -226,14 +180,10 @@ def main():
 
     # Create the encoed environment
     environment = EncodedRobotEnv(env=env1)
+
     # Creates the dnn agent
     random = tf.random.Generator.from_seed(1234)
-    state_spec = environment.states()
-    actions_spec = environment.actions()
-    agent = TDAgent.create(state_spec=state_spec,
-                            actions_spec=actions_spec,
-                            agent_spec=agent_spec(),
-                            random=random)
+    agent = create_agent(env=environment, random=random, args=args)
 
     tracers = reward_tracers(
         agent=agent, folder=args.stats) if args.stats is not None else None
@@ -248,6 +198,7 @@ def main():
         .register(agent, DiscountConsumer(0.99))
     frame_inter = int(1000 / _FPS)
     time_frame = pygame.time.get_ticks()
+    counter_to_save = 0 if args.agent is not None else args.num
     while running and robot.time() <= args.time:
         actions = agent.act(states=states)
         states, terminal, reward = environment.execute(actions=actions)
@@ -257,7 +208,11 @@ def main():
             window.set_robot(robot).set_reward(
                 float(reward_kpi.kpi())).render()
             time_frame += frame_inter
-
+        counter_to_save = counter_to_save - 1
+        if counter_to_save <= 0:
+            agent.save_model(args.model)
+            counter_to_save = args.num
+            logging.info(f"Saveing model into {args.model}")
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
