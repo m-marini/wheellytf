@@ -1,0 +1,124 @@
+{
+    "reward_alpha": 5e-3,
+    "critic": {
+        "alpha": 30e-3,
+        "tdlambda": 0.5,
+        "network": {
+            "output": {
+                "inputs": "input.obs",
+                "layers": [
+                    {
+                        "type": "dense",
+                        "output_size": 100
+                    },
+                    {
+                        "type": "relu"
+                    },
+                    {
+                        "type": "dense",
+                        "output_size": 100
+                    },
+                    {
+                        "type": "relu"
+                    },
+                    {
+                        "type": "dense",
+                        "output_size": 1
+                    },
+                    {
+                        "type": "tanh"
+                    }
+                ]
+            }
+        }
+    },
+    "policy": {
+        "alpha": 30e-3,
+        "tdlambda": 0.5,
+        "network": {
+            "features": {
+                "inputs": "input.obs",
+                "layers": [
+                    {
+                        "type": "dense",
+                        "output_size": 100
+                    },
+                    {
+                        "type": "relu"
+                    },
+                    {
+                        "type": "dense",
+                        "output_size": 100
+                    },
+                    {
+                        "type": "relu"
+                    }
+                ]
+            },
+            "output.halt": {
+                "inputs": "features",
+                "layers": [
+                    {
+                        "type": "dense",
+                        "output_size": 2
+                    },
+                    {
+                        "type": "tanh"
+                    },
+                    {
+                        "type": "softmax",
+                        "temperature": 0.4
+                    }
+                ]
+            },
+            "output.direction": {
+                "inputs": "features",
+                "layers": [
+                    {
+                        "type": "dense",
+                        "output_size": 25
+                    },
+                    {
+                        "type": "tanh"
+                    },
+                    {
+                        "type": "softmax",
+                        "temperature": 0.4
+                    }
+                ]
+            },
+            "output.speed": {
+                "inputs": "features",
+                "layers": [
+                    {
+                        "type": "dense",
+                        "output_size": 9
+                    },
+                    {
+                        "type": "tanh"
+                    },
+                    {
+                        "type": "softmax",
+                        "temperature": 0.4
+                    }
+                ]
+            },
+            "output.sensorAction": {
+                "inputs": "features",
+                "layers": [
+                    {
+                        "type": "dense",
+                        "output_size": 7
+                    },
+                    {
+                        "type": "tanh"
+                    },
+                    {
+                        "type": "softmax",
+                        "temperature": 0.4
+                    }
+                ]
+            }
+        }
+    }
+}

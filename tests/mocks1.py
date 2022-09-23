@@ -1,13 +1,6 @@
 from __future__ import annotations
 
-from ast import Call
-from types import NoneType
-from typing import Any, Callable
-
-import numpy as np
-import tensorflow as tf
 from tensorforce.environments import Environment
-from wheelly.tdagents import TDAgent
 
 
 class ContinuousMockEnv(Environment):
