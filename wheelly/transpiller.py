@@ -87,10 +87,16 @@ class NetworkTranspiller:
         """Generates the inputs for each network sequence"""
         layers = []
         for seq_name, seq_spec in self.spec["network"].items():
+            assert "layers" in seq_spec
+            seq_layers = seq_spec["layers"]
+            assert isinstance(seq_layers, list)
+            n = len(seq_layers)
+
             # Parse for inputs specification
             inputes = seq_spec.get("inputs", "input")
             offset = 0
             if isinstance(inputes, str):
+                assert n > 0
                 inputes = [inputes]
             else:
                 # Parse for composite inputs specification
@@ -105,7 +111,8 @@ class NetworkTranspiller:
                 assert len(inputes) > 0
                 for s in inputes:
                     assert isinstance(s, str)
-                layer0 = dict(name=f"{seq_name}[0]",
+                name = seq_name if n == 0 else f"{seq_name}[0]"
+                layer0 = dict(name=name,
                               type=type,
                               inputs=inputes)
                 layers.append(layer0)
@@ -113,11 +120,6 @@ class NetworkTranspiller:
                 offset = 1
 
             # Parse for layers
-            assert "layers" in seq_spec
-            seq_layers = seq_spec["layers"]
-            assert isinstance(seq_layers, list)
-            n = len(seq_layers)
-            assert n > 0
             for i in range(n):
                 layer_spec = seq_layers[i].copy()
                 layer_name = seq_name if i >= n - 1 \
@@ -188,7 +190,8 @@ class NetworkTranspiller:
             elif type == "sum":
                 size = self.output_size(inputs[0])
                 for inp in inputs:
-                    assert self.output_size(inp) == size
+                    assert self.output_size(inp) == size,\
+                        f'size of sum input "{inp}" must be equal to size of input "{inputs[0]}" ({self.output_size(inp)}) != ({size})'
                 return size
             elif type in ["relu", "lin", "tanh", "softmax"]:
                 return self.output_size(inputs[0])
