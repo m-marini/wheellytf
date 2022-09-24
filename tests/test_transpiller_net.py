@@ -108,6 +108,37 @@ def net3_spec():
     }
 
 
+def net4_spec():
+    return dict(
+        input_spec=dict(
+            input=dict(shape=[4])
+        ),
+        output_spec=dict(
+            output=dict(type="int",
+                        shape=(1,),
+                        num_values=2)
+        ),
+        alpha=0.1,
+        tdlambda=0.5,
+        network=dict(
+            hidden0=dict(
+                layers=[dict(type="dense", output_size=2)]
+            ),
+            hidden1=dict(
+                inputs="hidden0",
+                layers=[dict(type="dense", output_size=2)]
+            ),
+            output=dict(
+                inputs=dict(
+                    type="sum",
+                    inputs=["hidden0", "hidden1"]
+                ),
+                layers=[]
+            )
+        )
+    )
+
+
 def test_parse0():
     ts = NetworkTranspiller(spec=net0_spec())
     ts.validate_spec()
@@ -351,4 +382,49 @@ def test_parse3():
             dict(name="output.b",
                  type="relu",
                  inputs=["layer3"]),
+        ])
+
+
+def test_parse4():
+    ts = NetworkTranspiller(spec=net4_spec())
+    ts.validate_spec()
+    ts.parse_for_inputs()
+    assert ts.layers == {
+        "hidden0": dict(name="hidden0", type="dense", output_size=2, inputs=["input"]),
+        "hidden1": dict(name="hidden1", type="dense", output_size=2, inputs=["hidden0"]),
+        "output": dict(name="output", type="sum", inputs=["hidden0", "hidden1"])
+    }
+    assert ts.inputs == ["input"]
+    assert ts.sinks == ["output"]
+
+    ts.validate_layers()
+    assert ts.output_size("hidden0") == 2
+    assert ts.output_size("hidden1") == 2
+    assert ts.output_size("output") == 2
+
+    ts.sort_layers()
+    assert ts.forward_order == [
+        "hidden0",
+        "hidden1",
+        "output"
+    ]
+
+    spec = ts.parse()
+    assert spec == dict(
+        alpha=0.1,
+        tdlambda=0.5,
+        layers=[
+            dict(name="hidden0",
+                 type="dense",
+                 input_size=4,
+                 output_size=2,
+                 inputs=["input"]),
+            dict(name="hidden1",
+                 type="dense",
+                 input_size=2,
+                 output_size=2,
+                 inputs=["hidden0"]),
+            dict(name="output",
+                 type="sum",
+                 inputs=["hidden0", "hidden1"]),
         ])

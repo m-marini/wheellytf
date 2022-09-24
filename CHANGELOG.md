@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Issue #31: Save and load TD model
 - Issue #32: Add concat and sum nodes
 
+### Fix
+
+- Issue #36: Fix error generation on empty layers
+
 ## [0.2.0] 2022-08-03
 
 ### Fixed

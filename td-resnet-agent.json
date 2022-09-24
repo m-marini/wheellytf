@@ -1,0 +1,231 @@
+{
+    "reward_alpha": 5e-3,
+    "critic": {
+        "alpha": 30e-3,
+        "tdlambda": 0.5,
+        "network": {
+            "layer0": {
+                "inputs": "input.obs",
+                "layers": [
+                    {
+                        "type": "dense",
+                        "output_size": 100
+                    },
+                    {
+                        "type": "relu"
+                    }
+                ]
+            },
+            "hidden0": {
+                "inputs": "layer0",
+                "layers": [
+                    {
+                        "type": "dense",
+                        "output_size": 100
+                    },
+                    {
+                        "type": "relu"
+                    },
+                    {
+                        "type": "dense",
+                        "output_size": 100
+                    },
+                    {
+                        "type": "relu"
+                    }
+                ]
+            },
+            "res0": {
+                "inputs": {
+                    "type": "sum",
+                    "inputs": [
+                        "layer0",
+                        "hidden0"
+                    ]
+                },
+                "layers": []
+            },
+            "hidden1": {
+                "inputs": "res0",
+                "layers": [
+                    {
+                        "type": "dense",
+                        "output_size": 100
+                    },
+                    {
+                        "type": "relu"
+                    },
+                    {
+                        "type": "dense",
+                        "output_size": 100
+                    },
+                    {
+                        "type": "relu"
+                    }
+                ]
+            },
+            "features": {
+                "inputs": {
+                    "type": "sum",
+                    "inputs": [
+                        "res0",
+                        "hidden1"
+                    ]
+                },
+                "layers": []
+            },
+            "output": {
+                "inputs": "features",
+                "layers": [
+                    {
+                        "type": "dense",
+                        "output_size": 1
+                    },
+                    {
+                        "type": "tanh"
+                    }
+                ]
+            }
+        }
+    },
+    "policy": {
+        "alpha": 30e-3,
+        "tdlambda": 0.5,
+        "network": {
+            "layer0": {
+                "inputs": "input.obs",
+                "layers": [
+                    {
+                        "type": "dense",
+                        "output_size": 100
+                    },
+                    {
+                        "type": "relu"
+                    }
+                ]
+            },
+            "hidden0": {
+                "inputs": "layer0",
+                "layers": [
+                    {
+                        "type": "dense",
+                        "output_size": 100
+                    },
+                    {
+                        "type": "relu"
+                    },
+                    {
+                        "type": "dense",
+                        "output_size": 100
+                    },
+                    {
+                        "type": "relu"
+                    }
+                ]
+            },
+            "res0": {
+                "inputs": {
+                    "type": "sum",
+                    "inputs": [
+                        "layer0",
+                        "hidden0"
+                    ]
+                },
+                "layers": []
+            },
+            "hidden1": {
+                "inputs": "res0",
+                "layers": [
+                    {
+                        "type": "dense",
+                        "output_size": 100
+                    },
+                    {
+                        "type": "relu"
+                    },
+                    {
+                        "type": "dense",
+                        "output_size": 100
+                    },
+                    {
+                        "type": "relu"
+                    }
+                ]
+            },
+            "features": {
+                "inputs": {
+                    "type": "sum",
+                    "inputs": [
+                        "res0",
+                        "hidden1"
+                    ]
+                },
+                "layers": []
+            },
+            "output.halt": {
+                "inputs": "features",
+                "layers": [
+                    {
+                        "type": "dense",
+                        "output_size": 2
+                    },
+                    {
+                        "type": "tanh"
+                    },
+                    {
+                        "type": "softmax",
+                        "temperature": 0.4
+                    }
+                ]
+            },
+            "output.direction": {
+                "inputs": "features",
+                "layers": [
+                    {
+                        "type": "dense",
+                        "output_size": 25
+                    },
+                    {
+                        "type": "tanh"
+                    },
+                    {
+                        "type": "softmax",
+                        "temperature": 0.4
+                    }
+                ]
+            },
+            "output.speed": {
+                "inputs": "features",
+                "layers": [
+                    {
+                        "type": "dense",
+                        "output_size": 9
+                    },
+                    {
+                        "type": "tanh"
+                    },
+                    {
+                        "type": "softmax",
+                        "temperature": 0.4
+                    }
+                ]
+            },
+            "output.sensorAction": {
+                "inputs": "features",
+                "layers": [
+                    {
+                        "type": "dense",
+                        "output_size": 7
+                    },
+                    {
+                        "type": "tanh"
+                    },
+                    {
+                        "type": "softmax",
+                        "temperature": 0.4
+                    }
+                ]
+            }
+        }
+    }
+}
